@@ -235,6 +235,14 @@ h3.sect { margin: 30px 0 10px; font: 400 18px/1.2 var(--display); color: var(--t
 .mats .odyle { color: #c99bff; }
 .mats .miss { color: var(--up); }
 tr.normal td { background: rgba(255,255,255,.015); }
+.mats .npc { color: var(--dim); font-style: italic; }
+.mats .crafted { color: var(--down); }
+.craftprof { margin: 6px 0 4px; flex-wrap: wrap; }
+details.chain > summary { list-style: none; cursor: pointer; }
+details.chain > summary::-webkit-details-marker { display: none; }
+details.chain > summary .ch::before { content: "▸"; color: var(--muted); margin-right: -4px; }
+details.chain[open] > summary .ch::before { content: "▾"; }
+.npcmark { color: var(--dim); font-size: 11px; margin-left: 4px; cursor: help; }
 .badge.sell { background: var(--down-soft); color: var(--down); }
 .badge.hold { background: var(--up-soft); color: var(--up); }
 .badge.normal { background: var(--panel2); color: var(--muted); }
@@ -463,10 +471,17 @@ h3 { font: 400 17px/1.2 var(--display); color: var(--text); margin: 24px 0 8px; 
 
 <div class="wrap" id="craftView" hidden style="padding-top:0">
   <div class="intro" id="craftIntro"></div>
+  <div class="seg craftprof" id="craftProf"></div>
   <h3 class="sect" style="margin-top:4px">Üretip satınca en kârlı olanlar</h3>
   <div class="tablebox"><table class="deals">
     <thead><tr><th class="l">Item</th><th>Adım</th><th>Üretim maliyeti</th><th>Market fiyatı</th><th>Vergi sonrası kâr</th></tr></thead>
     <tbody id="craftBest"></tbody></table></div>
+  <h3 class="sect">Tek adımlı tarifler</h3>
+  <div class="tablebox"><table class="deals">
+    <thead><tr><th class="l">Ürün ve malzemeler</th><th>Tür</th><th>Malzeme maliyeti</th><th>Market fiyatı</th>
+      <th>Satış (kesinti sonrası)</th><th>Kâr</th></tr></thead>
+    <tbody id="craftSingles"></tbody></table></div>
+  <h3 class="sect">Ekipman zincirleri</h3>
   <div id="craftChains"></div>
 </div>
 
@@ -515,6 +530,15 @@ const EN = {
   "Önceki kademenin en ucuz yolu + bu adımın beklenen malzemesi": "Previous tier's cheapest route + this step's expected materials",
   "En ucuz yol": "Cheapest route", "Üretip satarsan, kesinti sonrası": "If you craft and sell, after the fee",
   "Üret-sat kârı": "Craft-and-sell profit",
+  "Tek adımlı tarifler": "Single-step recipes", "Ekipman zincirleri": "Equipment chains",
+  "Ürün ve malzemeler": "Product and materials", "Tür": "Type", "Malzeme maliyeti": "Material cost",
+  "Satış (kesinti sonrası)": "Sale (after fee)", "Kâr": "Profit", "Hepsi": "All",
+  "Mastery {0}": "Mastery {0}", "adet {0}": "{0} each", " (üret)": " (craft)",
+  "Kendin üretmek marketten ucuz": "Cheaper to craft yourself than to buy",
+  "NPC'den alınır, fiyatı bilinmiyor": "Bought from an NPC; price unknown",
+  "NPC'den alınan malzemeler (Bound) fiyatı bilinmediği için maliyete katılmadı": "NPC materials (Bound) are left out of the cost because their price is unknown",
+  "Bu meslekte tek adımlı tarif yok.": "No single-step recipes in this profession.",
+  "son adım üret-sat: {0}": "last step craft-and-sell: {0}",
   // page sections
   "Envanter değeri": "Inventory value", "Satılmaya değer": "Worth selling", "Envanter zamanı": "Inventory time",
   "oyuna her girişte güncellenir": "updated every time you log in", "Satış günü": "Best day to sell",
@@ -596,8 +620,8 @@ const EN = {
   // crafting
   "Her kademe için en ucuz yol: marketten <b>al</b> ya da bir önceki kademenin en ucuz yolundan <b>üret</b>.":
     "The cheapest way to each tier: <b>buy</b> it on the market or <b>craft</b> it from the previous tier's cheapest route.",
-  "Üretim maliyeti = bir denemenin malzemesi × beklenen deneme sayısı (her adımda %25 kombo ihtimali; 4. adımın normal sonucu ~1,06 denemede). Malzeme, Odyle'dan dönüştürmek daha ucuzsa öyle hesaplanır (mor). Kâr, market kesintisi ({0}) düşüldükten sonra. Tarifler ve oranlar topluluğun crafting tablosundan (Mastery 100); şansa bağlı olduğundan gerçek maliyet sapabilir. Fiyatlar şu anki market listesi.":
-    "Crafting cost = one attempt's materials × expected attempts (25% combo chance per step; step 4's normal result takes ~1.06 attempts). Materials are priced via Odyle when morphing is cheaper (purple). Profit is after the market fee ({0}). Recipes and rates come from the community crafting sheet (Mastery 100); since it's luck-based the real cost can differ. Prices are the current market listing.",
+  "Üretim maliyeti = bir denemenin malzemesi × beklenen deneme sayısı (her adımda %25 kombo ihtimali; 4. adımın normal sonucu ~1,06 denemede). Malzeme en ucuz yoldan hesaplanır: marketten, Odyle'dan dönüştürerek (mor) ya da kendi tarifinden üreterek (yeşil). NPC'den alınan (Bound) malzemelerin fiyatı bilinmediğinden maliyete katılmaz (+NPC). Kâr, market kesintisi ({0}) düşüldükten sonra. Tarifler aion2.app'in crafting veritabanından (NCSOFT verisi), kombo oranları topluluğun tablosundan; şansa bağlı olduğundan gerçek maliyet sapabilir. Fiyatlar şu anki market listesi.":
+    "Crafting cost = one attempt's materials × expected attempts (25% combo chance per step; step 4's normal result takes ~1.06 attempts). Each material takes its cheapest route: the market, morphing from Odyle (purple) or crafting it from its own recipe (green). NPC (Bound) materials are left out of the cost because their price is unknown (+NPC). Profit is after the market fee ({0}). Recipes come from aion2.app's crafting database (NCSOFT data), combo rates from the community sheet; since it's luck-based the real cost can differ. Prices are the current market listing.",
   "markette yok": "not on market", "{0} · {1}. adım": "{0} · step {1}",
   "Şu an üretip satınca kâr eden kademe yok.": "No tier is profitable to craft and sell right now.",
   " (fiyat yok)": " (no price)", "Odyle'dan dönüştürmek daha ucuz": "Cheaper to morph from Odyle", "Marketten": "From the market",
@@ -1202,20 +1226,40 @@ function renderCraft() {
   const craftIntro = document.getElementById("craftIntro");
   craftIntro.innerHTML = t("Her kademe için en ucuz yol: marketten <b>al</b> ya da bir önceki kademenin en ucuz yolundan <b>üret</b>.") +
     help(craftIntro, "Nasıl hesaplanıyor?", t("Üretim maliyeti = bir denemenin malzemesi × beklenen deneme sayısı (her adımda %25 kombo ihtimali; 4. adımın normal sonucu ~1,06 denemede). " +
-      "Malzeme, Odyle'dan dönüştürmek daha ucuzsa öyle hesaplanır (mor). Kâr, market kesintisi ({0}) düşüldükten sonra. " +
-      "Tarifler ve oranlar topluluğun crafting tablosundan (Mastery 100); şansa bağlı olduğundan gerçek maliyet sapabilir. Fiyatlar şu anki market listesi.",
+      "Malzeme en ucuz yoldan hesaplanır: marketten, Odyle'dan dönüştürerek (mor) ya da kendi tarifinden üreterek (yeşil). " +
+      "NPC'den alınan (Bound) malzemelerin fiyatı bilinmediğinden maliyete katılmaz (+NPC). Kâr, market kesintisi ({0}) düşüldükten sonra. " +
+      "Tarifler aion2.app'in crafting veritabanından (NCSOFT verisi), kombo oranları topluluğun tablosundan; şansa bağlı olduğundan gerçek maliyet sapabilir. Fiyatlar şu anki market listesi.",
       pctRaw(fee)));
   const named = x => `<div class="item">${iconHtml(x.icon)}<div class="txt"><span class="nm ${gradeCls(x)}">${esc(x.name)}</span>` +
     `<span class="sub">${x.listings ? t("{0} ilan", x.listings) : t("markette yok")}</span></div></div>`;
-  document.getElementById("craftBest").innerHTML = craftData.best_sales.length
-    ? craftData.best_sales.slice(0, 8).map(x => `<tr data-key="${x.item_key}">
-        <td class="l">${named(x)}</td><td class="muted">${t("{0} · {1}. adım", x.slot, x.step)}</td>
-        <td>${money(x.craft_cost)}</td><td class="price">${money(x.market_price)}</td>
+  const profs = [...new Set([...craftData.chains, ...(craftData.recipes || [])].map(x => x.profession))];
+  if (state.craftProf && !profs.includes(state.craftProf)) state.craftProf = "";
+  const profBox = document.getElementById("craftProf");
+  profBox.innerHTML = ["", ...profs].map(p => `<button data-prof="${p}" class="${(state.craftProf || "") === p ? "on" : ""}">${p ? esc(p) : t("Hepsi")}</button>`).join("");
+  profBox.onclick = e => { const b = e.target.closest("button[data-prof]"); if (b) { state.craftProf = b.dataset.prof; renderCraft(); } };
+  const inProf = x => !state.craftProf || x.profession === state.craftProf;
+  const npcMark = x => x.npc ? `<span class="npcmark" title="${t("NPC'den alınan malzemeler (Bound) fiyatı bilinmediği için maliyete katılmadı")}">+NPC</span>` : "";
+  const best = craftData.best_sales.filter(inProf);
+  document.getElementById("craftBest").innerHTML = best.length
+    ? best.slice(0, 12).map(x => `<tr data-key="${x.item_key}">
+        <td class="l">${named(x)}</td><td class="muted">${x.step ? t("{0} · {1}. adım", x.slot, x.step) : esc(x.slot)}</td>
+        <td>${money(x.craft_cost)}${npcMark(x)}</td><td class="price">${money(x.market_price)}</td>
         <td>${profitCell(x.sell_profit)}<span class="save">${pct(x.profit_pct)}</span></td></tr>`).join("")
     : `<tr><td colspan="5" class="empty">${t("Şu an üretip satınca kâr eden kademe yok.")}</td></tr>`;
+  const crafted = m => m.via === "craft" || m.via === "craft_npc";
   const matLine = m => m.price == null
     ? `<span class="miss">${m.qty}× ${esc(m.name)}${t(" (fiyat yok)")}</span>`
-    : `<span class="${m.via === "odyle" ? "odyle" : ""}" title="${t(m.via === "odyle" ? "Odyle'dan dönüştürmek daha ucuz" : "Marketten")}">${m.qty}× ${esc(m.name)} ${fmt(m.price)}${m.via === "odyle" ? " (Odyle)" : ""}</span>`;
+    : m.via === "npc" ? `<span class="npc" title="${t("NPC'den alınır, fiyatı bilinmiyor")}">${m.qty}× ${esc(m.name)} (NPC)</span>`
+    : `<span class="${m.via === "odyle" ? "odyle" : crafted(m) ? "crafted" : ""}" title="${t(m.via === "odyle" ? "Odyle'dan dönüştürmek daha ucuz"
+        : crafted(m) ? "Kendin üretmek marketten ucuz" : "Marketten")}">${m.qty}× ${esc(m.name)} ${fmt(m.price)}${m.via === "odyle" ? " (Odyle)" : crafted(m) ? t(" (üret)") : ""}</span>`;
+  const singles = (craftData.recipes || []).filter(inProf);
+  document.getElementById("craftSingles").innerHTML = singles.length ? singles.map(r => `<tr data-key="${r.item_key}">
+      <td class="l">${named(r)}<div class="mats">${r.materials.map(matLine).join("")}</div></td>
+      <td class="muted">${esc(r.category || r.profession)}<span class="save">${t("Mastery {0}", r.mastery)}${r.qty > 1 ? " · ×" + r.qty : ""}</span></td>
+      <td>${money(r.cost)}${npcMark(r)}${r.qty > 1 && r.unit_cost != null ? `<span class="save">${t("adet {0}", fmt(r.unit_cost))}</span>` : ""}</td>
+      <td class="price">${money(r.market_price)}</td><td>${money(r.revenue)}</td>
+      <td>${profitCell(r.profit)}${r.profit_pct != null ? `<span class="save">${pct(r.profit_pct)}</span>` : ""}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="empty">${t("Bu meslekte tek adımlı tarif yok.")}</td></tr>`;
   const tierRow = (st, x, normal) => `<tr data-key="${x.item_key}" class="${normal ? "normal" : ""}">
       <td class="rank">${normal ? "" : st.step}</td>
       <td class="l">${named(x)}${normal ? "" : `<div class="mats">${st.materials.map(matLine).join("")}</div>`}</td>
@@ -1223,14 +1267,19 @@ function renderCraft() {
       <td>${money(x.craft_cost)}</td><td class="price">${money(x.market_price)}</td>
       <td>${x.best ? `<span class="badge ${x.best}">${t(x.best === "buy" ? "Al" : "Üret")}</span> ${money(x.cost)}` : `<span class="na">–</span>`}</td>
       <td>${profitCell(x.sell_profit)}</td></tr>`;
-  document.getElementById("craftChains").innerHTML = craftData.chains.map(c => `<div class="chain">
-      <div class="ch"><h2>${c.slot}</h2><span class="muted">${c.profession}</span><span class="route">${t("En ucuz yol: {0}", esc(c.route))}</span></div>
+  const lastProfit = c => { const st = c.steps[c.steps.length - 1]; return [st.result, st.normal_result].map(x => x && x.sell_profit).filter(v => v != null); };
+  document.getElementById("craftChains").innerHTML = craftData.chains.filter(inProf).map(c => `<details class="chain"${(state.craftOpen || {})[c.slot] ? " open" : ""} data-slot="${esc(c.slot)}">
+      <summary><div class="ch"><h2>${esc(c.slot)}</h2><span class="muted">${esc(c.profession)}</span><span class="route">${t("En ucuz yol: {0}", esc(c.route))}</span>
+        ${lastProfit(c).length ? `<span class="muted">${t("son adım üret-sat: {0}", lastProfit(c).map(v => (v > 0 ? "+" : "") + fmt(v)).join(" / "))}</span>` : ""}${npcMark(c)}</div></summary>
       <div class="tablebox"><table class="deals">
         <thead><tr><th>${t("Adım")}</th><th class="l">${t("Sonuç ve bir denemenin malzemesi")}</th><th>${t("Bir deneme")}</th>
           <th title="${t("Önceki kademenin en ucuz yolu + bu adımın beklenen malzemesi")}">${t("Üretim maliyeti")}</th><th>${t("Market fiyatı")}</th>
           <th>${t("En ucuz yol")}</th><th title="${t("Üretip satarsan, kesinti sonrası")}">${t("Üret-sat kârı")}</th></tr></thead>
         <tbody>${c.steps.map(st => tierRow(st, st.result, false) + (st.normal_result ? tierRow(st, st.normal_result, true) : "")).join("")}</tbody>
-      </table></div></div>`).join("");
+      </table></div></details>`).join("");
+  document.querySelectorAll("#craftChains details.chain").forEach(d => d.ontoggle = () => {
+    state.craftOpen = { ...(state.craftOpen || {}), [d.dataset.slot]: d.open };
+  });
 }
 
 function setTitle() {

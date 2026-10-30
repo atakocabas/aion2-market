@@ -121,7 +121,7 @@ def parse_page(text: str, profession: str) -> list[dict]:
     for art in re.findall(r"<article.*?</article>", text, re.S):
         product = re.search(r'<a [^>]*href="/db/items/(\d+)"[^>]*>([^<]+)</a>', art)
         tags = [html.unescape(t.replace("<!-- -->", "")).strip()
-                for t in re.findall(r"<span[^>]*>((?:[^<]|<!-- -->)*)</span>", art[:art.find("Materials")])]
+                for t in re.findall(r"<span[^>]*>((?:[^<]|<!-- -->)*)</span>", art[:art.find("Materials</div>")])]
         mats = [[k, html.unescape(n), int(q)] for k, n, q in re.findall(
             r'href="/db/items/(\d+)"><img[^>]*/><span[^>]*>([^<]+)</span><span[^>]*>[^<]*?(?:<!-- -->)?(\d+)</span>', art)]
         if not product or not mats:

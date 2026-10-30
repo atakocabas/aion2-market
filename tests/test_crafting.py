@@ -3,7 +3,7 @@ import pytest
 from aion2market import crafting, exchange, recipes
 from aion2market.store import Store
 
-GUARD = recipes.CHAINS[0]
+GUARD = next(c for c in recipes.CHAINS if c["slot"] == "Guard" and c["race"] == "Asmodians")
 
 
 def _prices(**overrides):
@@ -14,7 +14,7 @@ def _prices(**overrides):
 
 
 def _guard(prices, fee=12.0):
-    return next(c for c in crafting.plan(prices, fee) if c["slot"] == "Guard")
+    return next(c for c in crafting.plan(prices, fee, race="Asmodians") if c["slot"] == "Guard")
 
 
 def test_craft_costs_accumulate_with_expected_tries():
@@ -53,4 +53,51 @@ def test_odyle_morph_used_when_cheaper_and_missing_prices_block_crafting():
 def test_recipe_items_are_always_polled():
     s = Store(":memory:")
     assert recipes.all_keys() <= set(exchange.tracked_keys(s))
-    assert len(recipes.all_keys()) == 62
+    assert all(not recipes.is_npc_item(name) for name in _names(recipes.all_keys()))
+
+
+def _names(keys):
+    names = {}
+    for r in recipes.RECIPES:
+        names[r["key"]] = r["name"]
+        names.update({k: n for k, n, _ in r["materials"]})
+    return [names.get(k, "") for k in keys]
+
+
+def test_chains_are_built_from_recipe_data():
+    """The Asmodian Guard chain the app started with, now generated from the recipe data."""
+    steps = GUARD["steps"]
+    assert [s["output"][0] for s in steps] == ["115050016", "115040014", "115030014", "115030021"]
+    assert steps[3]["normal_output"][0] == "115030019"
+    assert sorted((k, q) for k, _, q in steps[0]["materials"]) ==         [("610530001", 5), ("610610013", 2), ("610710001", 3)]
+    assert {(c["slot"], c["race"]) for c in recipes.CHAINS} >= {("Longsword", "Asmodians"), ("Greatsword", "Elyos")}
+
+
+def test_single_recipe_profit_uses_cheapest_materials_and_marks_npc_items():
+    ingot = next(r for r in recipes.SINGLES if r["key"] == "610710001" and r["qty"] == 1)
+    ore, solvent = ingot["materials"][0][0], ingot["materials"][1]
+    prices = {ore: {"price": 100.0, "count": 9}, "610710001": {"price": 500.0, "count": 9}}
+    row = next(r for r in crafting.singles(prices, 10.0) if r["item_key"] == "610710001" and r["qty"] == 1)
+    assert row["cost"] == 200 and row["npc"] and solvent[1].endswith("(Bound)")
+    assert row["profit"] == round(500 * 0.9 - 200)
+    # A chain material that is cheaper to craft than to buy uses the recipe
+    mc = crafting.material_cost("610710001", prices)
+    assert (mc["price"], mc["via"]) == (200.0, "craft_npc")
+
+
+def test_race_follows_the_market():
+    elyos_step1 = next(c for c in recipes.CHAINS if c["race"] == "Elyos")["steps"][0]["output"][0]
+    assert crafting.detect_race({elyos_step1: {"price": 1, "count": 1}}) == "Elyos"
+    assert crafting.detect_race({GUARD["steps"][0]["output"][0]: {"price": 1, "count": 1}}) == "Asmodians"
+    assert crafting.detect_race({}) is None
+
+
+def test_parse_page_reads_recipe_cards():
+    card = ('<article><div><a class="x" href="/db/items/610710001">Orichalcum Ingot</a></div><div><span>×10</span>'
+            '<span>Materials</span><span>Mastery<!-- --> <!-- -->25</span></div><div><div>Materials</div><div>'
+            '<a href="/db/items/610620013"><img src="a.webp"/><span>Orichalcum Ore</span><span>×<!-- -->20</span></a>'
+            '<a href="/db/items/630541001"><img src="b.webp"/><span>Orichalcum Solvent (Bound)</span><span>×<!-- -->10</span></a>'
+            '</div></div></article>')
+    [r] = recipes.parse_page(card, "Blacksmithing")
+    assert (r["key"], r["qty"], r["mastery"], r["race"], r["category"]) == ("610710001", 10, 25, None, "Materials")
+    assert r["materials"] == [["610620013", "Orichalcum Ore", 20], ["630541001", "Orichalcum Solvent (Bound)", 10]]

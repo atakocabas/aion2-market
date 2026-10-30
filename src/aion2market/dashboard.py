@@ -401,15 +401,22 @@ def inventory_view(store: Store, server_id: int | None = None, lang: str = "tr")
 
 
 def crafting_view(store: Store, server_id: int | None = None, lang: str = "tr") -> dict:
-    """Buy-or-craft for every chain at the current prices of this server."""
-    from .crafting import plan
+    """Buy-or-craft for every chain and craft-and-sell for every single recipe, at this server's prices."""
+    from .crafting import detect_race, plan, singles
     rows = item_rows(store, server_id=server_id)
     # Only items on the market now, and never a bogus far-above-normal listing as "the price".
     prices = {r["item_key"]: {"price": r["price"], "count": r["count"]} for r in rows["items"]
               if r["count"] and r.get("suspect") != "high"}
     info = store.item_info()
     fee = sell_fee_pct(store)
-    chains = plan(prices, fee, lang)
+    race = detect_race(prices) or detect_race({r["item_key"]: r for r in rows["items"]})
+    chains = plan(prices, fee, lang, race)
+    recipes = singles(prices, fee, race)
+
+    def decorate(x):
+        x["icon"] = info.get(x["item_key"], {}).get("icon")
+        x["grade_name"] = info.get(x["item_key"], {}).get("grade_name")
+
     best_sales = []
     for chain in chains:
         for step in chain["steps"]:
@@ -417,16 +424,21 @@ def crafting_view(store: Store, server_id: int | None = None, lang: str = "tr") 
                 t = step.get(key)
                 if not t:
                     continue
-                t["icon"] = info.get(t["item_key"], {}).get("icon")
-                t["grade_name"] = info.get(t["item_key"], {}).get("grade_name")
+                decorate(t)
                 if t["sell_profit"] and t["sell_profit"] > 0:
-                    best_sales.append({"slot": chain["slot"], "step": step["step"], **t,
+                    best_sales.append({"slot": chain["slot"], "step": step["step"], **t, "npc": chain["npc"],
                                        "profit_pct": round(t["sell_profit"] / t["craft_cost"] * 100, 1)})
             for m in step["materials"]:
-                m["icon"] = info.get(m["item_key"], {}).get("icon")
-                m["grade_name"] = info.get(m["item_key"], {}).get("grade_name")
-    return {"chains": chains, "fee_pct": fee, "server_id": rows["server_id"], "latest": rows["latest"],
-            "best_sales": sorted(best_sales, key=lambda t: -t["sell_profit"])}
+                decorate(m)
+    for r in recipes:
+        decorate(r)
+        for m in r["materials"]:
+            decorate(m)
+        if r["profit"] and r["profit"] > 0:
+            best_sales.append({**r, "slot": r["category"], "step": None, "craft_cost": r["cost"],
+                               "market_price": r["market_price"], "sell_profit": r["profit"]})
+    return {"chains": chains, "recipes": recipes, "race": race, "fee_pct": fee, "server_id": rows["server_id"],
+            "latest": rows["latest"], "best_sales": sorted(best_sales, key=lambda t: -t["sell_profit"])}
 
 
 def item_detail(store: Store, key: str, server_id: int | None = None, lang: str = "tr") -> dict:
