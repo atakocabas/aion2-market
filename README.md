@@ -165,6 +165,23 @@ Kurulum yönetici izni istemez (`%LOCALAPPDATA%\Programs\Aion 2 Market`). Sihirb
 
 GitHub'da `v*` etiketi gönderilince [release.yml](.github/workflows/release.yml) testleri çalıştırır, exe'yi ve kurulum dosyasını derler, ikisini de release'e ekler: `git tag v0.1.0 && git push origin v0.1.0`. Npcap'in lisansı kurulum dosyasına gömülmesine izin vermediği için kullanıcı onu kendisi kurar.
 
+#### İmzalama
+
+İmzasız exe'lerde Windows SmartScreen "Unknown publisher" uyarısı gösterir. [installer/sign.ps1](installer/sign.ps1) dosyaları bir kod imzalama sertifikasıyla imzalar (signtool, SHA-256, zaman damgası). Sertifika tanımlı değilse hiçbir şey yapmaz, yani derleme imzasız devam eder.
+
+- **Yerelde** (sertifika Windows deposunda ya da donanım token'ında; Windows SDK'nın signtool'u gerekir):
+
+  ```powershell
+  $env:AION2_SIGN_THUMBPRINT = "<sertifika parmak izi>"
+  installer\sign.ps1 dist\Aion2Market.exe
+  iscc /DAppVersion=0.1.0 "/Ssigner=powershell -NoProfile -ExecutionPolicy Bypass -File `$q$PWD\installer\sign.ps1`$q `$f" installer\aion2market.iss
+  ```
+
+  Sertifika `.pfx` dosyasıysa parmak izi yerine `AION2_SIGN_PFX` (dosya yolu) ve `AION2_SIGN_PFX_PASSWORD` kullanılır. Zaman damgası sunucusu `AION2_SIGN_TIMESTAMP` ile değiştirilebilir.
+- **GitHub'da:** `AION2_SIGN_PFX_BASE64` (`.pfx` dosyasının base64 hali) ve `AION2_SIGN_PFX_PASSWORD` secret'ları tanımlanınca release iş akışı exe'yi, kurulum dosyasını ve kaldırıcıyı imzalar.
+
+İmzalamak uyarıdaki yayıncı adını düzeltir. "Windows protected your PC" ekranı ise sertifika yeterince indirme itibarı kazanınca kaybolur.
+
 ### Fırsatlar sayfası
 
 Arayüzde üstteki **Fırsatlar** sekmesi, şu an alınması mantıklı görünen itemleri listeler. Bir item şu durumda listeye girer:

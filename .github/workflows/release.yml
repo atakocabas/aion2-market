@@ -20,14 +20,36 @@ jobs:
       - run: pip install -e ".[app,dev]"
       - run: pytest -q
       - run: pyinstaller aion2market.spec
+      # Optional: with the AION2_SIGN_PFX_BASE64 and AION2_SIGN_PFX_PASSWORD secrets set, the exe, setup and
+      # uninstaller are signed (installer/sign.ps1); without them the release is built unsigned as before.
+      - name: Sign exe
+        shell: pwsh
+        env:
+          SIGN_PFX_BASE64: ${{ secrets.AION2_SIGN_PFX_BASE64 }}
+          AION2_SIGN_PFX_PASSWORD: ${{ secrets.AION2_SIGN_PFX_PASSWORD }}
+        run: |
+          if ($env:SIGN_PFX_BASE64) {
+            $pfx = Join-Path $env:RUNNER_TEMP "sign.pfx"
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_PFX_BASE64))
+            "AION2_SIGN_PFX=$pfx" >> $env:GITHUB_ENV
+            $env:AION2_SIGN_PFX = $pfx
+          }
+          installer\sign.ps1 dist\Aion2Market.exe
       - name: Build installer
         shell: pwsh
+        env:
+          AION2_SIGN_PFX_PASSWORD: ${{ secrets.AION2_SIGN_PFX_PASSWORD }}
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
           $version = "${{ github.ref_name }}".TrimStart("v")
-          & $iscc "/DAppVersion=$version" installer\aion2market.iss
+          $sign = Join-Path $PWD "installer\sign.ps1"
+          & $iscc "/DAppVersion=$version" "/Ssigner=powershell -NoProfile -ExecutionPolicy Bypass -File `$q$sign`$q `$f" installer\aion2market.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Remove certificate
+        if: always()
+        shell: pwsh
+        run: Remove-Item (Join-Path $env:RUNNER_TEMP "sign.pfx") -ErrorAction SilentlyContinue
       - uses: softprops/action-gh-release@v3
         with:
           files: |

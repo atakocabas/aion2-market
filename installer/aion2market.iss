@@ -29,6 +29,11 @@ SolidCompression=yes
 WizardStyle=modern
 ; the uninstaller may remove SSLKEYLOGFILE; tell running programs
 ChangesEnvironment=yes
+; Signs setup and uninstaller when sign.ps1 has a certificate; the caller defines the tool (absolute path):
+;   iscc "/Ssigner=powershell -NoProfile -ExecutionPolicy Bypass -File C:\...\installer\sign.ps1 $f" ...
+#if GetEnv("AION2_SIGN_THUMBPRINT") != "" || GetEnv("AION2_SIGN_PFX") != ""
+SignTool=signer
+#endif
 
 [Languages]
 Name: "tr"; MessagesFile: "compiler:Languages\Turkish.isl"
