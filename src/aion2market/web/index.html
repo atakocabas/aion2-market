@@ -1050,7 +1050,7 @@ function help(el, label, body) {
   return `<details class="help"${open}><summary>${t(label)}</summary>${body}</details>`;
 }
 
-/* Filters shared by both pages: hide rules, search, category, minimum listings, names only. */
+/* Filters every list page applies: hide rules, plus the open page's search, category, minimum listings, favorites only. */
 function passesCommon(r) {
   if (!exclude.show_hidden && isHidden(r)) return false;
   if (state.favOnly && !r.watched) return false;
@@ -1304,7 +1304,22 @@ function setTitle() {
   document.title = page ? `${t(page)} · Aion 2 Market` : "Aion 2 Market";
 }
 
+/* Each page keeps its own toolbar filters; state.q, state.cat, ... hold the open page's and
+   state.pageFilters the others', so clearing a filter on Deals leaves Price changes as it was. */
+const PAGE_FILTERS = { q: "", cat: "", minc: 0, favOnly: false };
+function swapPageFilters(from, to) {
+  state.pageFilters = state.pageFilters || {};
+  state.pageFilters[from] = Object.fromEntries(Object.keys(PAGE_FILTERS).map(k => [k, state[k]]));
+  Object.assign(state, PAGE_FILTERS, state.pageFilters[to]);
+  document.getElementById("q").value = state.q;
+  document.getElementById("cat").value = state.cat;
+  document.getElementById("minc").value = state.minc;
+  document.getElementById("favOnly").checked = !!state.favOnly;
+  syncCatReset();
+}
+
 function setView(v) {
+  swapPageFilters(state.view, v);
   state.view = v; save();
   const deals = v === "deals", craft = v === "craft", inv = v === "inv", fav = v === "fav";
   const changes = !deals && !craft && !inv && !fav;
