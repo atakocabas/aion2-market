@@ -690,7 +690,7 @@ const EN = {
     "Cheapest on <b>{0}</b>, dearest on <b>{1}</b> (spread {2}). Based on the last 30 days with only a few samples per day, so not definitive.",
   "Listede tekrar göster": "Show in list again", "⊘ Listede gösterme": "⊘ Hide from list",
   "Bu item bir gizleme kuralına uyuyor.": "This item matches a hide rule.", "Favori ve hedef fiyat": "Favorite and target price",
-  "Hedef birim fiyat": "Target unit price", "Hedefi kaydet": "Save target", "★ Favorilere ekle": "★ Add to favorites",
+  "Hedef birim fiyat (ör. 2.5m)": "Target unit price (e.g. 2.5m)", "Geçersiz fiyat": "Invalid price", "Hedefi kaydet": "Save target", "★ Favorilere ekle": "★ Add to favorites",
   "Hedef fiyat girersen fiyat hedefin altına inince, girmezsen 7 gün ortalamasının %20 altına inince bildirim gelir.":
     "With a target price you're alerted when the price drops below it; without one, when it falls 20% under its 7-day average.",
   "Son aramadaki ilanlar": "Listings from the last search",
@@ -727,6 +727,23 @@ function translateStatic() {
 }
 const PF = { format: v => (Math.abs(v) < 1 && v !== 0 ? PF2 : PF1).format(v) };   // small moves keep 2 decimals
 const fmt = v => v == null ? "–" : NF.format(v);
+/* Typed prices: "2.5m" = 2 500 000, "2,5k" = 2 500, "750" and "2.500.000" as they are; "" → null, nonsense → NaN.
+   A lone "." or "," before exactly three digits without a suffix groups thousands (995.000), otherwise it's the decimal. */
+function parsePrice(s) {
+  s = String(s).trim().toLowerCase().replace(/\s/g, "");
+  if (!s) return null;
+  const m = s.match(/^([\d.,]+)([kmb]?)$/);
+  if (!m) return NaN;
+  let [, num, unit] = m;
+  const seps = num.match(/[.,]/g) || [];
+  if (seps.length) {
+    const last = Math.max(num.lastIndexOf("."), num.lastIndexOf(","));
+    const grouping = !unit && num.length - last - 1 === 3 && (seps.length === 1 || seps.every(c => c === seps[0]));
+    num = grouping ? num.replace(/[.,]/g, "") : num.slice(0, last).replace(/[.,]/g, "") + "." + num.slice(last + 1);
+  }
+  const v = Number(num) * { "": 1, k: 1e3, m: 1e6, b: 1e9 }[unit];
+  return Number.isFinite(v) ? Math.round(v) : NaN;
+}
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const dt = ts => ts ? new Date(ts * 1000) : null;
 const fmtTime = ts => ts ? dt(ts).toLocaleString(LOC, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "–";
@@ -1496,7 +1513,8 @@ async function openItem(key, quiet) {
     </div>
     <h3>${t("Favori ve hedef fiyat")}</h3>
     <div class="watch">
-      <input id="tg" type="number" min="0" placeholder="${t("Hedef birim fiyat")}" value="${d.watch && d.watch.target != null ? d.watch.target : ""}">
+      <input id="tg" type="text" inputmode="decimal" autocomplete="off" placeholder="${t("Hedef birim fiyat (ör. 2.5m)")}" value="${d.watch && d.watch.target != null ? d.watch.target : ""}">
+      <span class="hint" id="tgv"></span>
       <button class="btn gold" id="wsave">${t(d.watch ? "Hedefi kaydet" : "★ Favorilere ekle")}</button>
       ${d.watch ? `<button class="btn" id="wdel">${t("Favorilerden çıkar")}</button>` : ""}
     </div>
@@ -1514,7 +1532,17 @@ async function openItem(key, quiet) {
     post("/api/name", { item_key: key, name: v }, t(v ? "Ad kaydedildi" : (d.info ? "Resmi ada dönüldü" : "Ad silindi")));
   };
   document.getElementById("nm").onkeydown = e => { if (e.key === "Enter") document.getElementById("nmsave").click(); };
-  document.getElementById("wsave").onclick = () => post("/api/watch", { item_key: key, target: document.getElementById("tg").value }, t(d.watch ? "Hedef kaydedildi" : "Favorilere eklendi"));
+  const tg = document.getElementById("tg"), tgv = document.getElementById("tgv");
+  tg.oninput = () => {
+    const v = parsePrice(tg.value);
+    tgv.textContent = v == null ? "" : Number.isNaN(v) ? t("Geçersiz fiyat") : "= " + fmt(v);
+  };
+  tg.onkeydown = e => { if (e.key === "Enter") document.getElementById("wsave").click(); };
+  document.getElementById("wsave").onclick = () => {
+    const v = parsePrice(tg.value);
+    if (Number.isNaN(v)) return toast(t("Geçersiz fiyat"));
+    post("/api/watch", { item_key: key, target: v ?? "" }, t(d.watch ? "Hedef kaydedildi" : "Favorilere eklendi"));
+  };
   document.getElementById("hideOne").onclick = () => {
     const hiding = !exclude.items.includes(key);
     exclude.items = hiding ? [...exclude.items, key] : exclude.items.filter(k => k !== key);
