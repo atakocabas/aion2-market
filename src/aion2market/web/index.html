@@ -1,0 +1,1701 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aion 2 Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
+<style>
+/* Atreia at dusk: night-blue ground, aether cyan for anything you can act on,
+   Kinah gold only for money. Inscription face (Marcellus) for names of places and pages. */
+:root {
+  --bg: #151a2c; --bg2: #121626; --panel: #1b2137; --panel2: #232a45; --line: #323a5c; --line2: #272e4b;
+  --text: #e8ebf5; --muted: #9ba3c2; --dim: #6b7496;
+  --aether: #86d3e3; --aether-soft: rgba(134,211,227,.13); --aether-ink: #0e2a31;
+  --gold: #e7c47c; --gold-soft: rgba(231,196,124,.12);
+  --down: #63d6a2; --down-soft: rgba(99,214,162,.14);
+  --up: #f27d8c; --up-soft: rgba(242,125,140,.14);
+  --warn: #f0cf6a;
+  --radius: 12px; --r-sm: 7px;
+  --display: "Marcellus", "Palatino Linotype", Georgia, serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }      /* elements with their own display rule must still hide */
+html, body { margin: 0; color: var(--text); font: 14px/1.5 var(--body); font-feature-settings: "tnum" 1; }
+html { background: var(--bg2); }
+body { min-height: 100vh;
+  background: radial-gradient(1200px 420px at 18% -120px, rgba(134,211,227,.10), transparent 70%),
+              radial-gradient(900px 380px at 100% -160px, rgba(150,120,230,.10), transparent 70%),
+              linear-gradient(var(--bg) 0, var(--bg2) 900px); background-repeat: no-repeat; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--aether); outline-offset: 2px; }
+.wrap { max-width: 1360px; margin: 0 auto; padding: 22px 20px 48px; }
+
+header { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 22px;
+  padding-bottom: 0; border-bottom: 1px solid var(--line2); }
+header .topbar { flex: 0 0 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+header .topbar .seg button { padding: 4px 11px; }
+.topright { display: flex; align-items: center; gap: 12px; }
+.npcap { font-size: 12.5px; color: var(--dim); text-decoration: none; white-space: nowrap; }
+.npcap::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px;
+  vertical-align: 1px; background: currentColor; }
+.npcap.ok { color: var(--down); cursor: default; }
+.npcap.off { color: var(--muted); }
+.npcap.off:hover { color: var(--aether); }
+header .tabs { margin-top: 0; }
+.brand { display: flex; align-items: center; gap: 10px; font: 400 17px/1 var(--display); color: var(--text); letter-spacing: .02em; }
+.brand svg { width: 30px; height: 18px; color: var(--aether); flex: none; }
+.brand span { color: var(--muted); }
+h1 { margin: 2px 0 0; font-size: 22px; font-weight: 600; }
+header .spacer { flex: 1; }
+.server, .status, #refresh { margin-bottom: 12px; }
+.server { display: flex; gap: 6px; align-items: center; }
+.server select { min-width: 220px; }
+.icon-btn { padding: 7px 10px; }
+.status { color: var(--muted); font-size: 12.5px; text-align: right; line-height: 1.35; }
+.sync { font-size: 12px; color: var(--dim); }
+.sync.ok { color: var(--down); } .sync.err { color: var(--up); }
+.syncbox { position: relative; }
+button.sync { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; cursor: pointer; text-align: right; }
+button.sync:hover { text-decoration: underline; }
+.syncpanel { left: auto; right: 0; width: 300px; text-align: left; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.btn { background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 7px 13px;
+  cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.btn:hover { border-color: var(--aether); }
+.btn.gold { background: var(--aether); color: var(--aether-ink); border-color: var(--aether); font-weight: 600; }
+.btn.gold:hover { background: #a3e1ee; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* summary: one ledger strip, cells divided rather than boxed */
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px;
+  background: linear-gradient(180deg, rgba(35,42,69,.75), rgba(27,33,55,.75)); border: 1px solid var(--line2); border-radius: var(--radius); }
+.card { padding: 14px 20px 15px; min-width: 0; }
+.card + .card { border-left: 1px solid var(--line2); }
+.card .k { color: var(--muted); font-size: 12.5px; }
+.card .v { font-size: 26px; font-weight: 600; margin-top: 2px; letter-spacing: -.01em; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .s { color: var(--dim); font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .v.down { color: var(--down); }
+
+.toolbar { display: flex; gap: 8px 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.filterbox { position: relative; }
+#filterBtn.on { border-color: var(--aether); color: var(--aether); }
+.filterpanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 250px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px 16px;
+  background: var(--bg2); border: 1px solid var(--line2); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.35); }
+details.help { margin-top: 10px; color: var(--dim); font-size: 12px; max-width: 120ch; }
+.intro details.help { margin-top: 6px; }
+details.help summary { cursor: pointer; color: var(--muted); list-style: none; display: inline-flex; align-items: center; gap: 6px; }
+details.help summary::-webkit-details-marker { display: none; }
+details.help summary::before { content: "?"; display: inline-grid; place-items: center; width: 16px; height: 16px;
+  border-radius: 50%; border: 1px solid var(--line2); font-size: 11px; }
+details.help summary:hover { color: var(--aether); }
+details.help[open] summary { margin-bottom: 6px; }
+.seg { display: inline-flex; background: var(--bg2); border: 1px solid var(--line2); border-radius: 10px; padding: 3px; }
+.seg button { background: none; border: 0; padding: 6px 13px; border-radius: 7px; cursor: pointer; color: var(--muted); transition: color .15s, background .15s; }
+.seg button:hover { color: var(--text); }
+.seg button.on { background: var(--aether-soft); color: var(--aether); font-weight: 600; box-shadow: inset 0 0 0 1px rgba(134,211,227,.28); }
+.search { flex: 1; min-width: 220px; background: var(--bg2); border: 1px solid var(--line2); border-radius: 10px;
+  padding: 8px 12px 8px 34px; outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b7496' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 11px 50%; }
+.search:focus, select:focus, .num:focus { border-color: var(--aether); }
+#srvinput { padding-left: 12px; background-image: none; }
+select, .num { background: var(--bg2); border: 1px solid var(--line2); border-radius: 10px; padding: 7px 10px; outline: none; }
+select:hover, .num:hover, .search:hover { border-color: var(--line); }
+.num { width: 72px; }
+.catbox { display: inline-flex; gap: 6px; align-items: center; }
+.catbox select.on { border-color: var(--aether); color: var(--aether); }
+label.chk { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); cursor: pointer; user-select: none; font-size: 13px; }
+label.chk:hover { color: var(--text); }
+label.chk input { accent-color: var(--aether); }
+
+.tablebox { background: var(--panel); border: 1px solid var(--line2); border-radius: var(--radius); overflow: auto;
+  box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 18px 40px -24px rgba(5,8,20,.8); }
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
+th, td { padding: 9px 12px; text-align: right; white-space: nowrap; }
+th { position: sticky; top: 0; background: #20263f; color: var(--muted); font-weight: 500; font-size: 12.5px;
+  cursor: pointer; user-select: none; border-bottom: 1px solid var(--line); z-index: 1; }
+th:hover { color: var(--text); }
+th.sorted { color: var(--aether); font-weight: 600; }
+th.active-period, td.active-period { background: rgba(134,211,227,.04); }
+th .arrow { font-size: 9px; margin-left: 4px; }
+th.l, td.l { text-align: left; }
+tbody tr { border-top: 1px solid var(--line2); cursor: pointer; }
+tbody tr:hover { background: rgba(134,211,227,.045); }
+tbody tr.stale { opacity: .45; }
+tbody tr.sel { background: var(--aether-soft); box-shadow: inset 3px 0 0 var(--aether); }
+.item { display: flex; align-items: center; gap: 11px; min-width: 260px; }
+.icon { width: 34px; height: 34px; border-radius: 8px; flex: none; background: var(--panel2) center/cover no-repeat;
+  border: 1px solid var(--line); box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+.icon.big { width: 60px; height: 60px; border-radius: 12px; }
+.item .txt { display: flex; flex-direction: column; line-height: 1.28; min-width: 0; }
+.item .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
+.item .nm.unnamed { color: var(--dim); font-weight: 500; font-style: italic; }
+.item .sub { color: var(--dim); font-size: 12px; }
+.custom { color: var(--aether); font-size: 10px; margin-left: 4px; vertical-align: super; }
+.chip { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 9px; border-radius: 99px;
+  border: 1px solid currentColor; margin-right: 6px; }
+/* item grades as the game colors them (official gradeName), lowest to highest:
+   Common white, Rare green, Epic blue, Unique yellow, Heroic orange */
+.g-common { color: #e6e8ef; } .g-rare { color: #6fdc9a; } .g-epic { color: #62b0ff; }
+.g-unique { color: #f4d060; } .g-heroic { color: #ff9a4d; } .g-special { color: #c99bff; }
+
+/* hide settings */
+.btn.on { border-color: var(--aether); color: var(--aether); }
+.modal { position: fixed; inset: 0; display: none; align-items: flex-start; justify-content: center; z-index: 30;
+  background: rgba(8,10,22,.6); backdrop-filter: blur(3px); padding: 48px 16px; overflow-y: auto; }
+.modal.on { display: flex; }
+.sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; width: min(720px, 100%); padding: 24px;
+  box-shadow: 0 30px 80px -20px rgba(0,0,0,.6); }
+.sheet h2 { margin: 0 0 4px; font: 400 22px/1.2 var(--display); }
+.sheet h3 { margin: 22px 0 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chipbtn { background: var(--bg2); border: 1px solid var(--line2); border-radius: 99px; padding: 4px 12px;
+  cursor: pointer; font-size: 13px; color: var(--muted); }
+.chipbtn:hover { border-color: var(--line); color: var(--text); }
+.chipbtn.sel { background: var(--aether-soft); border-color: var(--aether); color: var(--text); }
+.chipbtn .n { color: var(--dim); font-size: 11px; margin-left: 5px; }
+.group { margin-top: 12px; }
+.group .gh { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 12.5px; color: var(--muted); }
+.group .gh button { background: none; border: 0; color: var(--aether); cursor: pointer; font-size: 12px; padding: 0; }
+.rule { display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--line2); border-radius: 9px; padding: 9px 12px; margin-bottom: 6px; }
+.rule .what { flex: 1; }
+.rule .x, .hidden-item .x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; }
+.rule .x:hover, .hidden-item .x:hover { color: var(--up); }
+.hidden-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.sheet .actions { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.preview { color: var(--muted); font-size: 13px; }
+.star { color: var(--dim); width: 36px; text-align: center; font-size: 15px; cursor: pointer; user-select: none; }
+.star:hover { color: var(--gold); }
+.star.on { color: var(--gold); text-shadow: 0 0 10px rgba(231,196,124,.45); }
+.price { font-variant-numeric: tabular-nums; font-weight: 600; }
+.chg { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.chg .bar { width: 44px; height: 4px; border-radius: 2px; background: var(--line2); position: relative; overflow: hidden; }
+.chg .bar i { position: absolute; top: 0; bottom: 0; right: 0; border-radius: 2px; }
+.chg.down { color: var(--down); } .chg.down .bar i { background: var(--down); }
+.chg.up { color: var(--up); } .chg.up .bar i { background: var(--up); }
+.chg.flat { color: var(--muted); }
+.chg .p { min-width: 64px; text-align: right; }
+/* Favorites and Deals are too wide for change bars: without them the tables fit without a horizontal scrollbar. */
+#favView .chg .bar, #dealsView .chg .bar { display: none; }
+#favView .chg .p, #dealsView .chg .p { min-width: 0; }
+.partial { color: var(--dim); font-size: 11px; margin-left: 2px; }
+.warn { color: var(--warn); cursor: help; font-weight: 400; }
+
+/* view tabs: inscription face, the one loud thing on the page */
+.tabs { display: flex; flex-wrap: wrap; gap: 0 26px; margin-top: 16px; }
+.tabs button { background: none; border: 0; padding: 4px 0 12px; font: 400 21px/1.15 var(--display); letter-spacing: .01em;
+  color: var(--dim); cursor: pointer; position: relative; transition: color .15s; }
+.tabs button:hover { color: var(--muted); }
+.tabs button.on { color: var(--text); }
+.tabs button.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--aether) 18%, var(--aether) 82%, transparent);
+  box-shadow: 0 0 12px rgba(134,211,227,.6); }
+
+/* deals page */
+.intro { border-left: 2px solid var(--aether); background: linear-gradient(90deg, var(--aether-soft), transparent 70%);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0; padding: 10px 16px; margin-bottom: 14px; color: var(--muted); font-size: 13px; max-width: 110ch; }
+.intro b { color: var(--text); font-weight: 600; }
+table.deals td.rank { color: var(--dim); width: 32px; }
+.disc { font-weight: 700; color: var(--down); font-variant-numeric: tabular-nums; }
+.save { color: var(--dim); font-size: 12px; display: block; }
+.range { position: relative; width: 120px; height: 6px; border-radius: 3px; display: inline-block;
+  background: linear-gradient(90deg, rgba(99,214,162,.55), rgba(255,255,255,.08) 50%, rgba(242,125,140,.45)); }
+.range i { position: absolute; top: -4px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; background: var(--text);
+  box-shadow: 0 0 0 2px var(--panel); }
+.range-l { color: var(--dim); font-size: 11px; display: flex; justify-content: space-between; width: 120px; margin: 3px 0 0 auto; }
+.note { display: block; margin-top: 2px; max-width: 380px; font-size: 11.5px; color: var(--down);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note .warn { color: var(--warn); }
+.dealbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.profit { font-weight: 700; font-variant-numeric: tabular-nums; }
+.profit.pos { color: var(--down); } .profit.neg { color: var(--dim); font-weight: 500; }
+h3.sect { margin: 30px 0 10px; font: 400 18px/1.2 var(--display); color: var(--text); letter-spacing: .01em; }
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-bottom: 14px; }
+.week .d { background: var(--panel); border: 1px solid var(--line2); border-radius: 9px; padding: 8px; text-align: center; }
+.week .d .n { color: var(--muted); font-size: 12px; }
+.week .d .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+.week .d.cheap { border-color: rgba(99,214,162,.5); background: var(--down-soft); } .week .d.cheap .v { color: var(--down); }
+.week .d.dear { border-color: rgba(242,125,140,.45); background: var(--up-soft); } .week .d.dear .v { color: var(--up); }
+.week .cap { grid-column: 1 / -1; color: var(--dim); font-size: 12px; }
+
+/* crafting page */
+.chain { margin-top: 28px; }
+.chain .ch { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.chain .ch h2 { margin: 0; font: 400 22px/1.2 var(--display); }
+.route { font-size: 12px; font-weight: 600; padding: 3px 11px; border-radius: 99px; background: var(--aether-soft); color: var(--aether); }
+.badge { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 99px; }
+.badge.buy { background: rgba(98,176,255,.15); color: #62b0ff; } .badge.craft { background: var(--down-soft); color: var(--down); }
+.mats { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 12px; color: var(--muted); white-space: normal; max-width: 520px; }
+.mats .odyle { color: #c99bff; }
+.mats .miss { color: var(--up); }
+tr.normal td { background: rgba(255,255,255,.015); }
+.badge.sell { background: var(--down-soft); color: var(--down); }
+.badge.hold { background: var(--up-soft); color: var(--up); }
+.badge.normal { background: var(--panel2); color: var(--muted); }
+.badge.check { background: rgba(240,207,106,.14); color: var(--warn); }
+.why { color: var(--muted); font-size: 12px; display: block; margin-top: 3px; white-space: normal; max-width: 260px; }
+.na { color: var(--dim); }
+.muted { color: var(--muted); }
+.spark { display: block; }
+.empty { padding: 56px 16px; text-align: center; color: var(--muted); }
+.foot { color: var(--dim); font-size: 12px; margin-top: 12px; max-width: 120ch; }
+
+/* detail drawer */
+.scrim { position: fixed; inset: 0; background: rgba(8,10,22,.5); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 9; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+aside { position: fixed; top: 0; right: 0; bottom: 0; width: min(540px, 100vw); background: linear-gradient(180deg, #1f2640, var(--panel) 260px);
+  border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .24s cubic-bezier(.2,.7,.2,1); z-index: 10;
+  overflow-y: auto; padding: 22px 22px 36px; box-shadow: -30px 0 60px -30px rgba(0,0,0,.7); }
+aside.on { transform: none; }
+aside .top { display: flex; align-items: flex-start; gap: 14px; }
+aside .top .brand { font: 500 12px/1.4 var(--body); color: var(--dim); letter-spacing: 0; }
+aside .top .x { margin-left: auto; background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; }
+aside .top .x:hover { color: var(--text); }
+aside h2 { margin: 2px 0 0; font: 400 24px/1.2 var(--display); }
+.namebox { display: flex; gap: 8px; margin: 16px 0 6px; }
+.namebox input { flex: 1; background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--r-sm); padding: 7px 10px; outline: none; }
+.namebox input:focus { border-color: var(--aether); }
+.hint { color: var(--dim); font-size: 12px; }
+.hint b { color: var(--muted); }
+.bigprice { font-size: 34px; font-weight: 600; color: var(--gold); margin-top: 16px; letter-spacing: -.01em; }
+.bigprice small { font-size: 13px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin: 14px 0; border: 1px solid var(--line2); border-radius: 10px; }
+.stat { padding: 10px 12px; }
+.stat + .stat { border-left: 1px solid var(--line2); }
+.stat .k { color: var(--muted); font-size: 12px; }
+.stat .v { font-weight: 600; margin-top: 2px; }
+.stat .s { color: var(--dim); font-size: 11px; }
+.chart { background: var(--bg2); border: 1px solid var(--line2); border-radius: 10px; padding: 10px; position: relative; }
+.chart svg { width: 100%; height: 190px; display: block; }
+.tip { position: absolute; pointer-events: none; background: rgba(12,15,28,.92); border: 1px solid var(--line); border-radius: 6px;
+  padding: 4px 8px; font-size: 12px; white-space: nowrap; transform: translate(-50%, -120%); display: none; }
+h3 { font: 400 17px/1.2 var(--display); color: var(--text); margin: 24px 0 8px; }
+.watch { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.watch input { width: 150px; background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--r-sm); padding: 7px 10px; outline: none; }
+.watch input:focus { border-color: var(--aether); }
+.mini { width: 100%; border-collapse: collapse; min-width: 0; }
+.mini td, .mini th { padding: 6px 8px; font-size: 13px; }
+.mini th { position: static; background: none; cursor: default; }
+.mini tr { border-top: 1px solid var(--line2); cursor: default; }
+.mini tr:hover { background: none; }
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 8px); background: var(--panel2);
+  border: 1px solid var(--aether); border-radius: 10px; padding: 9px 16px; opacity: 0; transition: opacity .2s, transform .2s; z-index: 40;
+  box-shadow: 0 12px 30px -10px rgba(0,0,0,.6); }
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+/* Narrower windows: drop the change bars, tighten cells and let long texts wrap so tables fit without a horizontal scrollbar. */
+@media (max-width: 1499px) {
+  .chg .bar { display: none; }
+  .chg .p { min-width: 0; }
+  th, td { padding-left: 8px; padding-right: 8px; }
+  th { white-space: normal; }
+  .item .nm, .why, .save { white-space: normal; }
+  .note { max-width: 260px; }
+}
+@media (max-width: 860px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card:nth-child(3) { border-left: 0; }
+  .card:nth-child(n+3) { border-top: 1px solid var(--line2); }
+  .card { padding: 12px 14px; }
+  .card .v { font-size: 20px; }
+  .wrap { padding: 16px 16px 40px; }
+  .status { text-align: left; }
+  .tabs { gap: 0 18px; }
+  .tabs button { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="topbar">
+      <div class="brand"><svg viewBox="0 0 30 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M15 16C12 10 7 6 1 5c3 3 4 6 4 9 3-2 6-2 10 2Z"/><path d="M15 16c3-6 8-10 14-11-3 3-4 6-4 9-3-2-6-2-10 2Z"/><path d="M15 3v10"/></svg>Aion 2 <span>Market</span></div>
+      <div class="topright">
+        <a id="npcap" class="npcap" target="_blank" rel="noopener"></a>
+        <div class="seg" id="lang" title="Dil"><button data-l="tr">TR</button><button data-l="en">EN</button></div>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-view="changes">Fiyat değişimleri</button>
+      <button data-view="deals">Fırsatlar</button>
+      <button data-view="craft">Üretim</button>
+      <button data-view="inv">Envanterim</button>
+      <button data-view="fav">Favoriler</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="server">
+      <select id="server" title="Market sunucusu"></select>
+      <button class="btn icon-btn" id="srvname" title="Sunucuya ad ver">✎</button>
+      <span id="srvedit" hidden><input id="srvinput" class="search" style="min-width:180px" maxlength="40" placeholder="Oyundaki sunucu adı">
+        <button class="btn gold" id="srvsave">Kaydet</button><button class="btn" id="srvcancel">✕</button></span>
+    </div>
+    <div class="status"><div id="status">Yükleniyor…</div>
+      <div class="syncbox">
+        <button id="sync" class="sync" aria-expanded="false"></button>
+        <div class="filterpanel syncpanel" id="syncPanel" hidden>
+          <label class="chk"><input type="checkbox" id="syncOn"> Fiyatları diğer oyuncularla paylaş</label>
+          <div>Açıkken oyunda gördüğün market fiyatları ortak depoya gönderilir, diğer oyuncuların gördükleri de sana gelir. Böylece market, sen açmasan da güncel kalır. Karakter, hesap ya da oturum bilgisi gönderilmez.</div>
+        </div>
+      </div>
+    </div>
+    <button class="btn" id="refresh" title="Yenile">↻ Yenile</button>
+  </header>
+
+  <section class="cards" id="cards">
+    <div class="card"><div class="k">Güncel listede</div><div class="v" id="c-count">–</div><div class="s" id="c-count-s">&nbsp;</div></div>
+    <div class="card"><div class="k">Fiyatı düşen</div><div class="v down" id="c-down">–</div><div class="s" id="c-down-s">&nbsp;</div></div>
+    <div class="card"><div class="k">En çok düşen</div><div class="v down" id="c-top">–</div><div class="s" id="c-top-s">&nbsp;</div></div>
+    <div class="card"><div class="k">Son market listesi</div><div class="v" id="c-last">–</div><div class="s" id="c-last-s">&nbsp;</div></div>
+  </section>
+
+  <div class="toolbar" id="toolbar">
+    <div class="seg" id="period">
+      <button data-p="prev" class="on">Son listeleme</button>
+      <button data-p="week">7 gün</button>
+      <button data-p="month">30 gün</button>
+    </div>
+    <input class="search" id="q" placeholder="Item ara…" autocomplete="off">
+    <div class="catbox">
+      <select id="cat"><option value="">Tüm kategoriler</option></select>
+      <button class="btn icon-btn" id="catReset" title="Kategori filtresini sıfırla" hidden>✕</button>
+    </div>
+    <div class="filterbox">
+      <button class="btn" id="filterBtn" aria-expanded="false">Filtreler</button>
+      <div class="filterpanel" id="filterPanel" hidden>
+        <select id="dir">
+          <option value="all">Tümü</option>
+          <option value="down">Sadece düşenler</option>
+          <option value="up">Sadece yükselenler</option>
+        </select>
+        <label class="chk" title="En az bu kadar ilanı olan itemler">Min. ilan <input class="num" id="minc" type="number" min="0" value="0"></label>
+        <label class="chk" title="Son market listesinde olmayan (0 ilanlı) itemler normalde listenin en altında gösterilir"><input type="checkbox" id="hideEmpty"> İlanı olmayanları gizle</label>
+        <label class="chk"><input type="checkbox" id="favOnly"> ★ Sadece favoriler</label>
+        <label class="chk" id="slidingBox" hidden title="Bir haftadır sürekli düşen itemlerin dibi daha aşağıda olabilir"><input type="checkbox" id="hideSliding"> Düşüşü sürenleri gizle</label>
+        <button class="btn" id="hideBtn" title="Görmek istemediğin itemleri gizle">⊘ Gizle</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="changesView">
+    <div class="tablebox">
+      <table>
+        <thead><tr id="head"></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+    <div class="foot" id="foot"></div>
+  </div>
+
+  <div id="invView" hidden>
+    <section class="cards">
+      <div class="card"><div class="k">Envanter değeri</div><div class="v" id="i-total">–</div><div class="s" id="i-total-s">&nbsp;</div></div>
+      <div class="card"><div class="k">Satılmaya değer</div><div class="v down" id="i-sell">–</div><div class="s" id="i-sell-s">&nbsp;</div></div>
+      <div class="card"><div class="k">Envanter zamanı</div><div class="v" id="i-ts">–</div><div class="s">oyuna her girişte güncellenir</div></div>
+      <div class="card"><div class="k">Satış günü</div><div class="v" id="i-day">–</div><div class="s" id="i-day-s">&nbsp;</div></div>
+    </section>
+    <div class="dealbar">
+      <div class="seg" id="invSignal">
+        <button data-g="">Tümü</button><button data-g="sell">Sat</button>
+        <button data-g="normal">Normal</button><button data-g="hold">Bekle</button>
+      </div>
+    </div>
+    <div class="tablebox">
+      <table class="deals">
+        <thead><tr id="invHead"></tr></thead>
+        <tbody id="invRows"></tbody>
+      </table>
+      <div class="empty" id="invEmpty" hidden></div>
+    </div>
+    <div class="foot" id="invFoot"></div>
+  </div>
+
+  <div id="favView" hidden>
+    <div class="dealbar">
+      <div class="seg" id="favKind">
+        <button data-g="">Tümü</button><button data-g="target">Hedefi olanlar</button><button data-g="none">Hedefsiz</button>
+      </div>
+    </div>
+    <div class="tablebox">
+      <table class="deals">
+        <thead><tr id="favHead"></tr></thead>
+        <tbody id="favRows"></tbody>
+      </table>
+      <div class="empty" id="favEmpty" hidden></div>
+    </div>
+    <div class="foot" id="favFoot"></div>
+  </div>
+
+  <div id="dealsView" hidden>
+    <div class="intro" id="dealsIntro"></div>
+    <div class="week" id="weekStrip" hidden></div>
+    <div class="dealbar">
+      <label class="chk"><input type="checkbox" id="profitOnly"> Sadece vergi sonrası kârlı olanlar</label>
+    </div>
+    <div class="tablebox">
+      <table class="deals">
+        <thead><tr id="dealHead"></tr></thead>
+        <tbody id="dealRows"></tbody>
+      </table>
+      <div class="empty" id="dealsEmpty" hidden></div>
+    </div>
+    <h3 class="sect">Odyle dönüştürme farkı</h3>
+    <div class="intro" id="morphIntro"></div>
+    <div class="tablebox">
+      <table class="deals">
+        <thead><tr><th class="l">Malzeme</th><th>Malzeme fiyatı</th><th class="l">Kaynak Odyle</th><th>Odyle fiyatı</th>
+          <th>Üretimde tasarruf</th><th>Dönüştürüp satma kârı</th></tr></thead>
+        <tbody id="morphRows"></tbody>
+      </table>
+    </div>
+    <div class="foot">Öneriler sadece geçmiş market fiyatlarına dayanır; fiyatın daha da düşmeyeceğinin garantisi yoktur. Almadan önce oyundaki ilanı kontrol et.</div>
+  </div>
+</div>
+
+<div class="wrap" id="craftView" hidden style="padding-top:0">
+  <div class="intro" id="craftIntro"></div>
+  <h3 class="sect" style="margin-top:4px">Üretip satınca en kârlı olanlar</h3>
+  <div class="tablebox"><table class="deals">
+    <thead><tr><th class="l">Item</th><th>Adım</th><th>Üretim maliyeti</th><th>Market fiyatı</th><th>Vergi sonrası kâr</th></tr></thead>
+    <tbody id="craftBest"></tbody></table></div>
+  <div id="craftChains"></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside id="drawer" aria-hidden="true"></aside>
+<div class="toast" id="toast"></div>
+<div class="modal" id="hideModal"><div class="sheet" id="hideSheet"></div></div>
+
+<script>
+"use strict";
+/* ---------- language ---------- */
+// English texts keyed by the Turkish original; t() falls back to the Turkish text. {0}, {1}… are arguments.
+const EN = {
+  // tabs, header, toolbar
+  "Fiyat değişimleri": "Price changes", "Fırsatlar": "Deals", "Üretim": "Crafting", "Envanterim": "My inventory",
+  "Favoriler": "Favorites", "Market sunucusu": "Market server", "Sunucuya ad ver": "Name this server",
+  "Oyundaki sunucu adı": "Server name in game", "Kaydet": "Save", "Yükleniyor…": "Loading…", "Yenile": "Refresh",
+  "↻ Yenile": "↻ Refresh", "Dil": "Language",
+  "Güncel listede": "In current listing", "Fiyatı düşen": "Price dropped", "En çok düşen": "Biggest drop",
+  "Son market listesi": "Last market listing", "Son listeleme": "Last listing", "7 gün": "7 days", "30 gün": "30 days",
+  "Item adı ya da kodu ara…": "Search item name or code…", "Tüm kategoriler": "All categories",
+  "Kategori filtresini sıfırla": "Clear category filter", "Tümü": "All", "Sadece düşenler": "Falling only",
+  "Sadece yükselenler": "Rising only", "En az bu kadar ilanı olan itemler": "Items with at least this many listings",
+  "Min. ilan": "Min. listings",
+  "Son market listesinde olmayan (0 ilanlı) itemler normalde listenin en altında gösterilir":
+    "Items missing from the last market listing (0 listings) are normally shown at the bottom",
+  "İlanı olmayanları gizle": "Hide items without listings", "Sadece adı olanlar": "Named only",
+  "★ Sadece favoriler": "★ Favorites only",
+  "Bir haftadır sürekli düşen itemlerin dibi daha aşağıda olabilir": "Items falling all week may not have bottomed yet",
+  "Düşüşü sürenleri gizle": "Hide ongoing slides", "Görmek istemediğin itemleri gizle": "Hide items you don't want to see",
+  "⊘ Gizle": "⊘ Hide", ", gösteriliyor": ", shown",
+  // table headers
+  "Item": "Item", "Birim fiyat": "Unit price", "İlan": "Listings", "Trend": "Trend", "Güncelleme": "Updated",
+  "Adet": "Qty", "7 gün ort.": "7-day avg.", "7 gün ort. göre": "vs 7-day avg.",
+  "Son 7 günün fiyat ortalaması (uydurma uç ilanlar hariç)": "Average price over the last 7 days (bogus outlier listings excluded)",
+  "Adet × fiyat, market kesintisi düşülmüş": "Qty × price, after the market fee", "Toplam (net)": "Total (net)",
+  "Öneri": "Advice", "Hedef": "Target", "Şu anki fiyatın hedefe uzaklığı": "How far the current price is from the target",
+  "Hedefe kalan": "To target", "Sende": "You own", "Durum": "Status", "İndirim": "Discount",
+  "Şimdi alıp 7 gün ortalamasından satarsan, market kesintisinden sonra adet başına kalan":
+    "Per-unit profit if you buy now and sell at the 7-day average, after the market fee",
+  "Al-sat kârı": "Flip profit", "30 gün aralığı": "30-day range", "Malzeme": "Material", "Malzeme fiyatı": "Material price",
+  "Kaynak Odyle": "Source Odyle", "Odyle fiyatı": "Odyle price", "Üretimde tasarruf": "Crafting saving",
+  "Dönüştürüp satma kârı": "Morph-and-sell profit", "Adım": "Step", "Üretim maliyeti": "Crafting cost",
+  "Market fiyatı": "Market price", "Vergi sonrası kâr": "Profit after tax", "Toplam": "Total", "Birim": "Unit",
+  "Sonuç ve bir denemenin malzemesi": "Result and one attempt's materials", "Bir deneme": "One attempt",
+  "Önceki kademenin en ucuz yolu + bu adımın beklenen malzemesi": "Previous tier's cheapest route + this step's expected materials",
+  "En ucuz yol": "Cheapest route", "Üretip satarsan, kesinti sonrası": "If you craft and sell, after the fee",
+  "Üret-sat kârı": "Craft-and-sell profit",
+  // page sections
+  "Envanter değeri": "Inventory value", "Satılmaya değer": "Worth selling", "Envanter zamanı": "Inventory time",
+  "oyuna her girişte güncellenir": "updated every time you log in", "Satış günü": "Best day to sell",
+  "7 günde yükselen": "Rose in 7 days", "Son listelemede yükselen": "Rose since last listing",
+  "7 gün ort. üstünde": "Over 7-day avg.", "Değer": "Value", "Sat": "Sell", "Normal": "Normal", "Bekle": "Wait",
+  "Kontrol et": "Check", "Hedefe yakınlık": "Closest to target", "7 günde düşen": "Fell in 7 days", "Ada göre": "By name",
+  "Hedefi olanlar": "With target", "Hedefsiz": "No target",
+  "Hedef fiyatı değiştirmek için satıra tıkla.": "Click a row to change its target price.",
+  "Hedefi olan item hedefin altına inince bildirim gelir; hedefsiz favoriler 7 gün ortalamasının %20 altına inince bildirilir.":
+    "Items with a target alert you when they drop below it; favorites without a target alert you when they fall 20% under their 7-day average.",
+  "Puana göre": "By score", "Al-sat kârına göre": "By flip profit", "Sadece vergi sonrası kârlı olanlar": "Profitable after tax only",
+  "Odyle dönüştürme farkı": "Odyle morph margin",
+  "Odyle, aynı seviyedeki cevher, mücevher ve kütüğe 1:1 dönüştürülebilir.": "Odyle can be morphed 1:1 into the ore, gemstone and log of the same tier.",
+  "Üretim için": "For crafting",
+  ": malzeme Odyle'dan pahalıysa Odyle alıp dönüştürmek daha ucuz.": ": if the material costs more than its Odyle, buying Odyle and morphing is cheaper.",
+  "Satış için": "For selling",
+  ": Odyle alıp dönüştürüp malzemeyi satınca market kesintisinden sonra kalan. Dönüştürmenin kendi maliyeti (varsa) hesaba katılmadı.":
+    ": what's left after the market fee when you buy Odyle, morph it and sell the material. The morph's own cost (if any) is not included.",
+  "Öneriler sadece geçmiş market fiyatlarına dayanır; fiyatın daha da düşmeyeceğinin garantisi yoktur. Almadan önce oyundaki ilanı kontrol et.":
+    "Suggestions are based only on past market prices; there's no guarantee the price won't fall further. Check the in-game listing before buying.",
+  "Üretip satınca en kârlı olanlar": "Most profitable to craft and sell",
+  // time and generic
+  "az önce": "just now", "{0} dk önce": "{0} min ago", "{0} sa önce": "{0} h ago", "{0} gün önce": "{0} days ago",
+  "son listelemeye göre": "vs last listing", "7 güne göre": "vs 7 days", "30 güne göre": "vs 30 days",
+  "Karşılaştıracak eski kayıt yok": "No older record to compare with",
+  "Veri {0} tarihinden beri; bu süreden kısa": "Data since {0}; shorter than this period",
+  "Adsız": "Unnamed", "Adsız item": "Unnamed item", "{0} ilan": "{0} listings", "{0} item": "{0} items", "yok": "none",
+  "Kaydedilemedi": "Couldn't save", "Filtrelere uyan item yok.": "No items match the filters.",
+  "En ucuz ilan 30 günlük fiyatlara göre uç değerde": "The cheapest listing is an outlier against 30-day prices",
+  // hide settings
+  "Zırh": "Armor", "Silah": "Weapon", "Aksesuar": "Accessory", "Diğer": "Other",
+  "Ayar kaydedilemedi": "Couldn't save the setting", "Her nadirlik": "Any grade", "her kategori": "any category",
+  "tüm {0}": "all {0}", "Listede gösterme": "Hide from list",
+  "Burada seçtiklerin listeden gizlenir. Ayar veritabanına kaydedilir; tarayıcı değişse de kalır.":
+    "What you pick here is hidden from the list. The setting is saved in the database, so it stays even if you switch browsers.",
+  "Yeni kural": "New rule",
+  "Nadirlik <b>ve</b> kategori birlikte eşleşirse gizlenir. Birini boş bırakırsan “hepsi” sayılır.":
+    "Hidden when grade <b>and</b> category both match. Leave one empty to mean “all”.",
+  "Nadirlik": "Grade", "seçimi kaldır": "clear selection", "tümünü seç": "select all", "Kuralı ekle": "Add rule",
+  "Bu kural {0} item'ı gizler": "This rule hides {0} items", "Nadirlik ya da kategori seç": "Pick a grade or category",
+  "Kurallar": "Rules", "Kuralı sil": "Delete rule", "Henüz kural yok.": "No rules yet.",
+  "Tek tek gizlenen itemler": "Individually hidden items", "Tekrar göster": "Show again",
+  "Yok. Bir item'ı tek başına gizlemek için satırına tıkla, detay panelinde “Listede gösterme”yi seç.":
+    "None. To hide a single item, click its row and choose “Hide from list” in the detail panel.",
+  "Gizlenenleri geçici olarak göster": "Temporarily show hidden items", "Kural eklendi": "Rule added",
+  "Kural silindi": "Rule deleted", "Item tekrar gösteriliyor": "Item shown again",
+  // favorites
+  "Favorilerden çıkar": "Remove from favorites", " (hedef {0})": " (target {0})", "Favorilere ekle": "Add to favorites",
+  "Bu item'ın hedef fiyatı var; favorilerden çıkarılırsa bildirimler de durur. Devam edilsin mi?":
+    "This item has a target price; removing it from favorites also stops its alerts. Continue?",
+  "Favorilere eklendi": "Added to favorites", "Favorilerden çıkarıldı": "Removed from favorites",
+  "{0} altında": "{0} under", "{0} üstünde": "{0} over", "{0} fark": "{0} to go", "Markette yok": "Not on market",
+  "Hedefin altında": "Under target", "7 gün ort. {0} altında": "{0} under 7-day avg.", "Bekleniyor": "Waiting",
+  "İzleniyor": "Watching", "Filtrelere uyan favori yok.": "No favorites match the filters.",
+  "Henüz favorin yok. Diğer sayfalarda bir item'ın ☆ işaretine tıkla ya da item'ı açıp hedef fiyat gir.":
+    "No favorites yet. Click an item's ☆ on the other pages, or open an item and enter a target price.",
+  // deals
+  "Şu an <b>kendi 7 günlük ortalama fiyatının en az {0} altında</b> olan ve <b>son listelemede ya da 7 günde en az {1} düşen</b> itemler. En az {2} ilanı ve {3} günlük geçmişi olmalı; uydurma uç fiyatlar sayılmaz. Sıralama: indirim × 30 günün dibine yakınlık × ilan sayısı; bir haftadır düşüşte olanlar ani düşüşlerin arkasına alınır.":
+    "Items currently <b>at least {0} under their own 7-day average</b> that <b>fell at least {1} since the last listing or over 7 days</b>. They need at least {2} listings and {3} days of history; bogus outlier prices don't count. Ranking: discount × closeness to the 30-day bottom × listings; items sliding for a week rank behind sudden dips.",
+  "Şu an normal fiyatının altında olan itemler: <b>{0}</b> öneri": "Items below their usual price right now: <b>{0}</b> suggestions",
+  " (filtrelerle {0} tanesi gizli)": " ({0} hidden by filters)", "adet başı {0} ucuz": "{0} cheaper each",
+  "Fiyatın 30 günlük aralıktaki yeri; en dipteki önce": "Where the price sits in its 30-day range; lowest first",
+  "{0} getiri": "{0} return","30 günlük aralık (uç değerler hariç) {0} – {1}": "30-day range (outliers excluded) {0} – {1}",
+  "Filtrelere uyan öneri yok.": "No suggestions match the filters.", "Şu an bu kurallara uyan fırsat yok.": "No deals match these rules right now.",
+  "Son 30 gün: en ucuz gün <b>{0}</b>, en pahalı gün <b>{1}</b>.": "Last 30 days: cheapest day <b>{0}</b>, dearest day <b>{1}</b>.",
+  "Odyle al, {0} ucuz": "buy Odyle, {0} cheaper", "malzemeyi al": "buy the material",
+  "Odyle ve malzemelerin güncel fiyatı yok.": "No current prices for Odyle and the materials.",
+  // inventory
+  "{0} satılabilir item çeşidi · kesinti sonrası": "{0} sellable item types · after fee",
+  '{0} item "Sat" önerisinde': '{0} items marked "Sell"', "henüz yok": "none yet",
+  "fiyatlar en yüksek; en düşük {0} (fark {1})": "highest prices; lowest on {0} (spread {1})",
+  "{0}'den listele": "list at {0}",
+  "Envanter henüz yok. Oyuna giriş yaptığında kendiliğinden gelir.": "No inventory yet. It arrives by itself when you log in to the game.",
+  '"Sat": fiyat 7 gün ortalamasının en az %10 üstünde ya da 7 günde en az %15 yükselmiş. "Bekle": 7 gün ortalamasının en az %10 altında. ':
+    '"Sell": the price is at least 10% over its 7-day average or rose at least 15% in 7 days. "Wait": at least 10% under its 7-day average. ',
+  "Önerilen fiyat, en ucuz ilanın 1 altı (en ucuz ilan uydurmaysa 7 gün ortalaması). Market kesintisi {0}. ":
+    "The suggested price is 1 under the cheapest listing (the 7-day average if that listing is bogus). Market fee {0}. ",
+  "Markette şu an ilanı olmayan {0} item listede yok: {1}.": "{0} items with no listings on the market right now aren't shown: {1}.",
+  // crafting
+  "Her kademe için en ucuz yol: marketten <b>al</b> ya da bir önceki kademenin en ucuz yolundan <b>üret</b>.":
+    "The cheapest way to each tier: <b>buy</b> it on the market or <b>craft</b> it from the previous tier's cheapest route.",
+  "Üretim maliyeti = bir denemenin malzemesi × beklenen deneme sayısı (her adımda %25 kombo ihtimali; 4. adımın normal sonucu ~1,06 denemede). Malzeme, Odyle'dan dönüştürmek daha ucuzsa öyle hesaplanır (mor). Kâr, market kesintisi ({0}) düşüldükten sonra. Tarifler ve oranlar topluluğun crafting tablosundan (Mastery 100); şansa bağlı olduğundan gerçek maliyet sapabilir. Fiyatlar şu anki market listesi.":
+    "Crafting cost = one attempt's materials × expected attempts (25% combo chance per step; step 4's normal result takes ~1.06 attempts). Materials are priced via Odyle when morphing is cheaper (purple). Profit is after the market fee ({0}). Recipes and rates come from the community crafting sheet (Mastery 100); since it's luck-based the real cost can differ. Prices are the current market listing.",
+  "markette yok": "not on market", "{0} · {1}. adım": "{0} · step {1}",
+  "Şu an üretip satınca kâr eden kademe yok.": "No tier is profitable to craft and sell right now.",
+  " (fiyat yok)": " (no price)", "Odyle'dan dönüştürmek daha ucuz": "Cheaper to morph from Odyle", "Marketten": "From the market",
+  "{0} deneme": "{0} attempts", " (normal sonuç)": " (normal result)", "Al": "Buy", "Üret": "Craft",
+  "En ucuz yol: {0}": "Cheapest route: {0}",
+  // price changes page
+  "Senin verdiğin ad": "Name you gave",
+  "Son 30 günün fiyatlarının çok üstünde (7 gün ort. {0}); büyük ihtimalle tek bir uydurma ilan. Değişim gösterilmiyor.":
+    "Far above the last 30 days' prices (7-day avg. {0}); most likely a single bogus listing. Change not shown.",
+  "Son 30 günün fiyatlarının çok altında (7 gün ort. {0}); fırsat da olabilir, hatalı ilan da.":
+    "Far below the last 30 days' prices (7-day avg. {0}); could be a bargain or a mistaken listing.",
+  "Önceki: {0} · {1}": "Previous: {0} · {1}", "7 gün önce: {0} · {1}": "7 days ago: {0} · {1}",
+  "30 gün önce: {0} · {1}": "30 days ago: {0} · {1}",
+  "Son market listesinde yok. Son görüldüğünde {0} ilan, {1}": "Not in the last market listing. Last seen with {0} listings, {1}",
+  "Henüz fiyat yok. Oyunda pazarı aç ya da bir item ara; fiyatlar burada görünür.":
+    "No prices yet. Open the market or search an item in game; prices show up here.",
+  "Henüz fiyat yok. Oyundaki pazar fiyatlarını kaydetmek için Npcap gerekli; sağ üstteki bağlantıdan indirebilirsin.":
+    "No prices yet. Recording in-game market prices needs Npcap; you can download it from the link at the top right.",
+  "Bu tablo hakkında": "About this table", "Nasıl seçiliyor?": "How are they picked?", "Nasıl hesaplanıyor?": "How is this calculated?",
+  "Öneriler nasıl hesaplanıyor?": "How is the advice calculated?", "Bildirim ne zaman gelir?": "When do alerts come?",
+  "Filtreler": "Filters", "Item ara…": "Search items…",
+  "toplam {0} item kayıtlı": "{0} items recorded in total", "{0} · görünen {1} item içinde": "{0} · among {1} shown items",
+  "düşen item yok": "no item fell", "kayıtlar {0} tarihinden beri": "records since {0}",
+  "Fiyatlar birim fiyattır (Kinah). “Son listeleme” bir önceki market açılışıyla karşılaştırır. ":
+    "Prices are unit prices (Kinah). “Last listing” compares with the previous market opening. ",
+  "<b>*</b> Kayıtlar {0} günlük; daha kısa sürenin değişimi gösteriliyor. ":
+    "<b>*</b> Records span {0} days; the change over that shorter period is shown. ",
+  "Soluk satırlar en son market listesinde yer almayan (0 ilanlı) itemler; her zaman en altta gösterilir, fiyatları son görüldükleri andan.":
+    "Faded rows are items missing from the latest market listing (0 listings); they're always shown at the bottom, with prices from when they were last seen.",
+  // servers and status
+  "Sunucu {0}": "Server {0}", " (senin)": " (yours)", "Ortak veri: kapalı": "Shared data: off",
+  "Ortak veri hatası: {0}": "Shared data error: {0}", "Ortak veri: eşitlendi {0}": "Shared data: synced {0}",
+  "Ortak veri: bekleniyor": "Shared data: waiting", "Ortak veri ayarı": "Shared data setting",
+  "Ortak veri açıldı": "Shared data on", "Ortak veri kapatıldı": "Shared data off",
+  "Fiyatları diğer oyuncularla paylaş": "Share prices with other players",
+  "Açıkken oyunda gördüğün market fiyatları ortak depoya gönderilir, diğer oyuncuların gördükleri de sana gelir. Böylece market, sen açmasan da güncel kalır. Karakter, hesap ya da oturum bilgisi gönderilmez.":
+    "While on, the market prices you see in game go to a shared store, and what other players see comes to you, so the market stays current even when you don't open it. No character, account or session data is sent.",
+"Npcap kurulumu aktif": "Npcap installation active",
+  "Npcap kurulu değil · indir": "Npcap not installed · download",
+  "Oyunda açtığın pazar aramaları anında kaydediliyor.": "Market searches you open in game are recorded instantly.",
+  "Npcap kurarsan oyunda açtığın pazar aramaları anında kaydedilir; en güncel fiyatlar böyle gelir.":
+    "With Npcap installed, market searches you open in game are recorded instantly; that's how the freshest prices come in.",
+"Güncellendi {0}": "Updated {0}",
+  "Sunucuya ulaşılamıyor": "Can't reach the server", "Sunucu adı kaydedildi": "Server name saved",
+  // detail drawer
+  "Kapat": "Close", "Bu item'a bir ad ver": "Give this item a name",
+  "Resmi item verisinde ve aion2.exchange'de bu item'ın adı yok; adını sen verebilirsin.":
+    "Neither the official item data nor aion2.exchange has a name for this item; you can name it yourself.",
+  "Ad aion2.exchange'den: <b>{0}</b> (NCSoft'un resmi verisinde yok). İstersen kendi adını ver; boş bırakıp kaydedersen bu ada döner.":
+    "Name from aion2.exchange: <b>{0}</b> (not in NCSoft's official data). You can give it your own name; saving it empty goes back to this one.",
+  "Resmi ad: <b>{0}</b>. İstersen kendi adını ver; boş bırakıp kaydedersen resmi ada döner.":
+    "Official name: <b>{0}</b>. You can give it your own name; saving it empty goes back to the official one.",
+  "Kinah / adet": "Kinah / unit",
+  "Son 30 günün fiyatlarının çok üstünde (7 gün ort. {0}); büyük ihtimalle tek bir uydurma ilan, değişim hesaplanmadı.":
+    "Far above the last 30 days' prices (7-day avg. {0}); most likely a single bogus listing, change not calculated.",
+  "30 gün en düşük {0} · en yüksek {1} · {2} kayıt": "30-day low {0} · high {1} · {2} records",
+  " · camgöbeği bant: 6 saatlik en düşük–en yüksek (aion2.exchange)": " · cyan band: 6-hour low–high (aion2.exchange)",
+  " · {0} uç değer (30 günlük medyan {1}'in ×{2} üstü ya da ¼ altı) gösterilmedi":
+    " · {0} outliers (over ×{2} or under ¼ of the 30-day median {1}) not shown",
+  "Haftalık düzen (bu item)": "Weekly pattern (this item)",
+  "En ucuz <b>{0}</b>, en pahalı <b>{1}</b> (fark {2}). Son 30 güne dayanır; her gün için birkaç örnek var, kesin değildir.":
+    "Cheapest on <b>{0}</b>, dearest on <b>{1}</b> (spread {2}). Based on the last 30 days with only a few samples per day, so not definitive.",
+  "Listede tekrar göster": "Show in list again", "⊘ Listede gösterme": "⊘ Hide from list",
+  "Bu item bir gizleme kuralına uyuyor.": "This item matches a hide rule.", "Favori ve hedef fiyat": "Favorite and target price",
+  "Hedef birim fiyat": "Target unit price", "Hedefi kaydet": "Save target", "★ Favorilere ekle": "★ Add to favorites",
+  "Hedef fiyat girersen fiyat hedefin altına inince, girmezsen 7 gün ortalamasının %20 altına inince bildirim gelir.":
+    "With a target price you're alerted when the price drops below it; without one, when it falls 20% under its 7-day average.",
+  "Son aramadaki ilanlar": "Listings from the last search",
+  "Bu item oyunda henüz aranmadı. Aradığında ilanlar burada görünür.": "This item hasn't been searched in game yet. Its listings show up here once you do.",
+  "Ad kaydedildi": "Name saved", "Resmi ada dönüldü": "Back to the official name", "Ad silindi": "Name removed",
+  "Hedef kaydedildi": "Target saved", "Listeden gizlendi": "Hidden from list", "Listede tekrar gösteriliyor": "Shown in list again",
+  "Grafik için en az iki kayıt gerekli.": "At least two records are needed for a chart.", " · aralık {0}–{1}": " · range {0}–{1}",
+};
+const LANGS = ["tr", "en"];
+let LANG = "tr", LOC = "tr-TR", NF, PF1, PF2;
+const t = (s, ...a) => ((LANG === "en" && EN[s]) || s).replace(/\{(\d)\}/g, (_, i) => a[i]);
+const pct = v => LANG === "en" ? PF.format(v) + "%" : "%" + PF.format(v);       // Turkish puts % first
+const pctRaw = v => LANG === "en" ? v + "%" : "%" + v;
+function setLocale(lang) {
+  LANG = lang; LOC = lang === "en" ? "en-US" : "tr-TR";
+  NF = new Intl.NumberFormat(LOC, { maximumFractionDigits: 0 });
+  PF1 = new Intl.NumberFormat(LOC, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  PF2 = new Intl.NumberFormat(LOC, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.documentElement.lang = lang;
+}
+// The page's own static texts and titles, remembered in Turkish so they can be switched back and forth.
+const STATIC = [];
+{
+  const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walk.nextNode());) if (n.nodeValue.trim() && n.parentElement.tagName !== "SCRIPT") STATIC.push([n, n.nodeValue]);
+  document.querySelectorAll("[title], [placeholder]").forEach(el =>
+    ["title", "placeholder"].forEach(a => { if (el.hasAttribute(a)) STATIC.push([el, el.getAttribute(a), a]); }));
+}
+function translateStatic() {
+  STATIC.forEach(([n, orig, attr]) => {
+    if (attr) n.setAttribute(attr, t(orig));
+    else n.nodeValue = orig.replace(orig.trim(), t(orig.trim()));
+  });
+}
+const PF = { format: v => (Math.abs(v) < 1 && v !== 0 ? PF2 : PF1).format(v) };   // small moves keep 2 decimals
+const fmt = v => v == null ? "–" : NF.format(v);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const dt = ts => ts ? new Date(ts * 1000) : null;
+const fmtTime = ts => ts ? dt(ts).toLocaleString(LOC, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "–";
+const fmtDate = ts => ts ? dt(ts).toLocaleDateString(LOC, { day: "numeric", month: "long" }) : "–";
+const ago = ts => {
+  if (!ts) return "–";
+  const m = Math.round((Date.now() / 1000 - ts) / 60);
+  if (m < 1) return t("az önce");
+  if (m < 60) return t("{0} dk önce", m);
+  const h = Math.round(m / 60);
+  return h < 48 ? t("{0} sa önce", h) : t("{0} gün önce", Math.round(h / 24));
+};
+const gradeCls = r => r && r.grade_name ? "g-" + r.grade_name.toLowerCase().replace(/[^a-z]/g, "") : "";
+const iconHtml = (url, big) => `<span class="icon${big ? " big" : ""}"${url ? ` style="background-image:url('${encodeURI(url)}')"` : ""}></span>`;
+const PERIOD_LABEL ={ prev: "son listelemeye göre", week: "7 güne göre", month: "30 güne göre" };
+
+const COLS = [
+  { id: "star", label: "★", cls: "star", sort: r => r.watched ? 0 : 1 },
+  { id: "name", label: "Item", cls: "l", sort: r => (r.name || "￿" + r.item_key).toLocaleLowerCase("tr") },
+  { id: "price", label: "Birim fiyat", sort: r => r.price },
+  { id: "prev", label: "Son listeleme", sort: r => r.prev.change },
+  { id: "week", label: "7 gün", sort: r => r.week.change },
+  { id: "month", label: "30 gün", sort: r => r.month.change },
+  { id: "count", label: "İlan", sort: r => r.count },
+  { id: "spark", label: "Trend", nosort: true },
+  { id: "ts", label: "Güncelleme", sort: r => -r.ts },
+];
+
+const state = load({ view: "changes", period: "prev", sort: "prev", asc: true, q: "", cat: "", dir: "all", minc: 0,
+                     hideEmpty: false, named: false, hideSliding: false, lang: null });
+if (!LANGS.includes(state.lang)) {     // first visit: the browser's language; earlier users keep Turkish
+  let saved = null;
+  try { saved = localStorage.getItem("aion2-ui"); } catch {}
+  state.lang = saved || /^tr\b/i.test(navigator.language || "") ? "tr" : "en";
+}
+setLocale(state.lang);
+let dealsData = { items: [], rules: {} };
+let craftData = { chains: [], best_sales: [] };
+let invData = { items: [], unpriced: [] };
+delete state.listed;                     // replaced by hideEmpty (0-listing items now sit at the bottom)
+let data = { items: [] }, selected = null;
+
+function load(def) {
+  try { return Object.assign(def, JSON.parse(localStorage.getItem("aion2-ui") || "{}")); } catch { return def; }
+}
+function save() {
+  try { localStorage.setItem("aion2-ui", JSON.stringify(state)); } catch {}
+}
+
+function chg(c, partial, sinceTs) {
+  if (c == null) return `<span class="na" title="${t("Karşılaştıracak eski kayıt yok")}">–</span>`;
+  const cls = c < -0.05 ? "down" : c > 0.05 ? "up" : "flat";
+  const arrow = cls === "down" ? "▼" : cls === "up" ? "▲" : "";
+  const w = Math.min(100, Math.abs(c) * 2);           // 50% change fills the bar
+  const star = partial ? `<span class="partial" title="${t("Veri {0} tarihinden beri; bu süreden kısa", fmtDate(sinceTs))}">*</span>` : "";
+  return `<span class="chg ${cls}"><span class="bar"><i style="width:${w}%"></i></span>` +
+         `<span class="p">${arrow} ${pct(Math.abs(c))}${star}</span></span>`;
+}
+
+function spark(points) {
+  if (!points || points.length < 2) return `<span class="na">–</span>`;
+  const W = 92, H = 26, ys = points.map(p => p[1]);
+  const lo = Math.min(...ys), hi = Math.max(...ys), span = hi - lo || 1;
+  const xs = points.map((_, i) => i / (points.length - 1) * (W - 2) + 1);
+  const pts = points.map((p, i) => `${xs[i].toFixed(1)},${(H - 3 - (p[1] - lo) / span * (H - 6)).toFixed(1)}`).join(" ");
+  const color = ys[ys.length - 1] < ys[0] ? "var(--down)" : ys[ys.length - 1] > ys[0] ? "var(--up)" : "var(--muted)";
+  return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+}
+
+/* ---------- hide settings (stored in the database via /api/settings) ---------- */
+const GRADES = ["Common", "Rare", "Epic", "Unique", "Heroic", "Special"];       // lowest to highest
+const ARMOR = ["Top", "Legs", "Helm", "Pauldrons", "Gloves", "Shoes", "Cloak", "Guard"];
+const GROUPS = ["Zırh", "Silah", "Aksesuar", "Diğer"];
+const groupOf = r => r.type === "Accessory" ? "Aksesuar" : r.type === "Equip" ? (ARMOR.includes(r.category) ? "Zırh" : "Silah") : "Diğer";
+let exclude = { rules: [], items: [], show_hidden: false };
+let draft = { grades: new Set(), categories: new Set() };
+
+const ruleMatches = (rule, r) =>
+  (!rule.grades.length || rule.grades.includes(r.grade_name)) &&
+  (!rule.categories.length || rule.categories.includes(r.category));
+const isHidden = r => exclude.items.includes(r.item_key) || exclude.rules.some(rule => ruleMatches(rule, r));
+
+async function saveExclude(msg) {
+  try {
+    const r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ exclude }) });
+    if (!r.ok) throw new Error(r.status);
+    exclude = (await r.json()).exclude;
+    if (msg) toast(msg);
+  } catch { toast(t("Ayar kaydedilemedi")); }
+  render();
+  if (document.getElementById("hideModal").classList.contains("on")) renderHide();
+}
+
+function categoriesByGroup() {
+  const out = Object.fromEntries(GROUPS.map(g => [g, {}]));
+  data.items.forEach(r => { if (r.category) out[groupOf(r)][r.category] = (out[groupOf(r)][r.category] || 0) + 1; });
+  return out;
+}
+
+function describeRule(rule) {
+  const grades = rule.grades.length
+    ? rule.grades.map(g => `<b class="g-${g.toLowerCase()}">${esc(g)}</b>`).join(", ") : t("Her nadirlik");
+  let cats = t("her kategori");
+  if (rule.categories.length) {
+    const groups = categoriesByGroup();
+    const whole = GROUPS.filter(g => { const c = Object.keys(groups[g]); return c.length && c.every(x => rule.categories.includes(x)); });
+    const rest = rule.categories.filter(c => !whole.some(g => c in groups[g]));
+    const parts = [...whole.map(g => t("tüm {0}", t(g).toLocaleLowerCase(LOC))), ...rest.slice(0, 4).map(esc)];
+    cats = parts.join(", ") + (rest.length > 4 ? ` +${rest.length - 4}` : "");
+  }
+  return `${grades} · ${cats}`;
+}
+
+function renderHide() {
+  const groups = categoriesByGroup();
+  const gradeCounts = {};
+  data.items.forEach(r => { if (r.grade_name) gradeCounts[r.grade_name] = (gradeCounts[r.grade_name] || 0) + 1; });
+  const draftRule = { grades: [...draft.grades], categories: [...draft.categories] };
+  const draftCount = (draftRule.grades.length || draftRule.categories.length) ? data.items.filter(r => ruleMatches(draftRule, r)).length : 0;
+  const hiddenItems = exclude.items.map(k => data.items.find(r => r.item_key === k) || { item_key: k });
+  document.getElementById("hideSheet").innerHTML = `
+    <div class="top" style="display:flex;align-items:flex-start">
+      <div><h2>${t("Listede gösterme")}</h2>
+        <div class="hint">${t("Burada seçtiklerin listeden gizlenir. Ayar veritabanına kaydedilir; tarayıcı değişse de kalır.")}</div></div>
+      <button class="x" id="hideClose" style="margin-left:auto;background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+
+    <h3>${t("Yeni kural")}</h3>
+    <div class="hint" style="margin-bottom:8px">${t("Nadirlik <b>ve</b> kategori birlikte eşleşirse gizlenir. Birini boş bırakırsan “hepsi” sayılır.")}</div>
+    <div class="group"><div class="gh">${t("Nadirlik")}</div><div class="chips">
+      ${GRADES.filter(g => gradeCounts[g]).map(g => `<button class="chipbtn ${draft.grades.has(g) ? "sel" : ""}" data-grade="${g}">
+        <span class="g-${g.toLowerCase()}">●</span> ${g}<span class="n">${gradeCounts[g]}</span></button>`).join("")}
+    </div></div>
+    ${GROUPS.filter(g => Object.keys(groups[g]).length).map(g => {
+      const cats = Object.keys(groups[g]).sort((a, b) => a.localeCompare(b, "tr"));
+      const all = cats.every(c => draft.categories.has(c));
+      return `<div class="group"><div class="gh">${t(g)}<button data-group="${g}">${all ? t("seçimi kaldır") : t("tümünü seç")}</button></div>
+        <div class="chips">${cats.map(c => `<button class="chipbtn ${draft.categories.has(c) ? "sel" : ""}" data-cat="${esc(c)}">${esc(c)}<span class="n">${groups[g][c]}</span></button>`).join("")}</div></div>`;
+    }).join("")}
+    <div class="actions">
+      <button class="btn gold" id="ruleAdd" ${draftCount ? "" : "disabled"}>${t("Kuralı ekle")}</button>
+      <span class="preview">${draftCount ? t("Bu kural {0} item'ı gizler", draftCount) : t("Nadirlik ya da kategori seç")}</span>
+    </div>
+
+    <h3>${t("Kurallar")}</h3>
+    ${exclude.rules.length ? exclude.rules.map((rule, i) => `<div class="rule"><span class="what">${describeRule(rule)}</span>
+        <span class="muted">${t("{0} item", data.items.filter(r => ruleMatches(rule, r)).length)}</span>
+        <button class="x" data-del-rule="${i}" title="${t("Kuralı sil")}">✕</button></div>`).join("")
+      : `<div class="hint">${t("Henüz kural yok.")}</div>`}
+
+    <h3>${t("Tek tek gizlenen itemler")}</h3>
+    ${hiddenItems.length ? hiddenItems.map(r => `<div class="hidden-item">${iconHtml(r.icon)}
+        <span class="${gradeCls(r)}">${esc(r.name || t("Adsız"))}</span><span class="muted">${r.item_key}</span>
+        <button class="x" data-show-item="${r.item_key}" title="${t("Tekrar göster")}">✕</button></div>`).join("")
+      : `<div class="hint">${t("Yok. Bir item'ı tek başına gizlemek için satırına tıkla, detay panelinde “Listede gösterme”yi seç.")}</div>`}
+
+    <div class="actions" style="margin-top:18px">
+      <label class="chk"><input type="checkbox" id="showHidden" ${exclude.show_hidden ? "checked" : ""}> ${t("Gizlenenleri geçici olarak göster")}</label>
+    </div>`;
+  const sheet = document.getElementById("hideSheet");
+  sheet.querySelector("#hideClose").onclick = closeHide;
+  sheet.querySelectorAll("[data-grade]").forEach(b => b.onclick = () => { toggle(draft.grades, b.dataset.grade); renderHide(); });
+  sheet.querySelectorAll("[data-cat]").forEach(b => b.onclick = () => { toggle(draft.categories, b.dataset.cat); renderHide(); });
+  sheet.querySelectorAll("[data-group]").forEach(b => b.onclick = () => {
+    const cats = Object.keys(groups[b.dataset.group]);
+    const all = cats.every(c => draft.categories.has(c));
+    cats.forEach(c => all ? draft.categories.delete(c) : draft.categories.add(c));
+    renderHide();
+  });
+  sheet.querySelector("#ruleAdd").onclick = () => {
+    exclude.rules.push({ grades: [...draft.grades], categories: [...draft.categories] });
+    draft = { grades: new Set(), categories: new Set() };
+    saveExclude(t("Kural eklendi"));
+  };
+  sheet.querySelectorAll("[data-del-rule]").forEach(b => b.onclick = () => { exclude.rules.splice(+b.dataset.delRule, 1); saveExclude(t("Kural silindi")); });
+  sheet.querySelectorAll("[data-show-item]").forEach(b => b.onclick = () => {
+    exclude.items = exclude.items.filter(k => k !== b.dataset.showItem); saveExclude(t("Item tekrar gösteriliyor"));
+  });
+  sheet.querySelector("#showHidden").onchange = e => { exclude.show_hidden = e.target.checked; saveExclude(); };
+}
+const toggle = (set, v) => set.has(v) ? set.delete(v) : set.add(v);
+function openHide() { renderHide(); document.getElementById("hideModal").classList.add("on"); }
+function closeHide() { document.getElementById("hideModal").classList.remove("on"); }
+
+function filtered() {
+  const q = state.q.trim().toLocaleLowerCase("tr");
+  return data.items.filter(r => {
+    if (!exclude.show_hidden && isHidden(r)) return false;
+    if (state.hideEmpty && r.count === 0) return false;
+    if (state.favOnly && !r.watched) return false;
+    if (r.count < state.minc) return false;
+    if (state.cat && r.category !== state.cat) return false;
+    const c = r[state.period].change;
+    if (state.dir === "down" && !(c < 0)) return false;
+    if (state.dir === "up" && !(c > 0)) return false;
+    if (q && !(r.item_key.includes(q) || [r.name, r.official_name, r.category].some(s => (s || "").toLocaleLowerCase("tr").includes(q)))) return false;
+    return true;
+  });
+}
+
+function sorted(rows) {
+  const col = COLS.find(c => c.id === state.sort) || COLS[3];
+  const dir = state.asc ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    if ((a.count === 0) !== (b.count === 0)) return a.count === 0 ? 1 : -1;   // no listings: always last
+    const x = col.sort(a), y = col.sort(b);
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;                      // missing values always last
+    if (y == null) return -1;
+    return x < y ? -dir : x > y ? dir : 0;
+  });
+}
+
+function renderHead() {
+  document.getElementById("head").innerHTML = COLS.map(c => {
+    const on = state.sort === c.id;
+    const cls = [c.cls || "", on ? "sorted" : "", c.id === state.period ? "active-period" : ""].join(" ");
+    const arrow = on ? `<span class="arrow">${state.asc ? "▲" : "▼"}</span>` : "";
+    return `<th class="${cls}" data-col="${c.id}">${t(c.label)}${arrow}</th>`;
+  }).join("");
+}
+
+/* Click-to-sort tables. `desc` columns put the biggest value first on the first click;
+   the column and direction live in state[key] and state[key + "Asc"]. */
+function sortableTable(headId, key, cols, fallback) {
+  const col = () => cols.find(c => c.id === state[key]) || cols.find(c => c.id === fallback);
+  const asc = () => state[key + "Asc"] ?? !col().desc;
+  document.getElementById(headId).onclick = e => {
+    const c = cols.find(c => c.id === e.target.closest("th")?.dataset.col); if (!c || c.nosort) return;
+    if (col() === c) state[key + "Asc"] = !asc(); else { state[key] = c.id; state[key + "Asc"] = !c.desc; }
+    save(); render();
+  };
+  return {
+    sort(rows) {
+      const c = col(), dir = asc() ? 1 : -1;
+      return rows.slice().sort((a, b) => {
+        const x = c.sort(a), y = c.sort(b);
+        if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;   // missing values always last
+        return x < y ? -dir : x > y ? dir : 0;
+      });
+    },
+    renderHead() {
+      const cur = col(), up = asc();
+      document.getElementById(headId).innerHTML = cols.map(c => {
+        const on = c === cur, arrow = on ? `<span class="arrow">${up ? "▲" : "▼"}</span>` : "";
+        return `<th class="${c.cls || ""} ${on ? "sorted" : ""}" data-col="${c.id}"${c.title ? ` title="${t(c.title)}"` : ""}>${t(c.label)}${arrow}</th>`;
+      }).join("");
+    },
+  };
+}
+const byName = r => (r.name || "￿" + r.item_key).toLocaleLowerCase("tr");
+const AVG_TITLE = "Son 7 günün fiyat ortalaması (uydurma uç ilanlar hariç)";
+
+/* Favorites = the watchlist. A star adds an item without a target price (no alerts until one is set). */
+function starCell(r) {
+  const tip = r.watched ? t("Favorilerden çıkar") + (r.target ? t(" (hedef {0})", fmt(r.target)) : "") : t("Favorilere ekle");
+  return `<td class="star ${r.watched ? "on" : ""}" data-star="${r.item_key}" title="${tip}">${r.watched ? "★" : "☆"}</td>`;
+}
+
+async function toggleFavorite(key) {
+  const rows = [data.items.find(r => r.item_key === key), dealsData.items.find(r => r.item_key === key)].filter(Boolean);
+  const adding = !rows.some(r => r.watched);
+  if (!adding && rows.some(r => r.target) &&
+      !confirmSafe(t("Bu item'ın hedef fiyatı var; favorilerden çıkarılırsa bildirimler de durur. Devam edilsin mi?"))) return;
+  rows.forEach(r => { r.watched = adding; if (!adding) r.target = null; });       // instant feedback
+  render();
+  try {
+    const res = await fetch("/api/watch", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(adding ? { item_key: key, target: "" } : { item_key: key, watch: false }) });
+    if (!res.ok) throw new Error(res.status);
+    toast(t(adding ? "Favorilere eklendi" : "Favorilerden çıkarıldı"));
+  } catch {
+    toast(t("Kaydedilemedi"));
+  }
+  refresh();
+}
+
+// confirm() is unavailable in some embedded browsers; there, removal just proceeds.
+function confirmSafe(msg) {
+  try { return window.confirm(msg); } catch { return true; }
+}
+
+function render() {
+  if (state.view === "deals") renderDeals();
+  else if (state.view === "craft") renderCraft();
+  else if (state.view === "inv") renderInventory();
+  else if (state.view === "fav") renderFavorites();
+  else renderChanges();
+  const hidden = data.items.filter(isHidden).length, hb = document.getElementById("hideBtn");
+  hb.textContent = hidden ? `${t("⊘ Gizle")} (${hidden}${exclude.show_hidden ? t(", gösteriliyor") : ""})` : t("⊘ Gizle");
+  hb.classList.toggle("on", hidden > 0);
+  const v = state.view, changes = !["deals", "craft", "inv", "fav"].includes(v);
+  const active = [changes && state.dir !== "all", state.minc > 0, changes && state.hideEmpty,
+                  v !== "fav" && state.favOnly, v === "deals" && state.hideSliding].filter(Boolean).length;
+  const fb = document.getElementById("filterBtn");
+  fb.textContent = active ? `${t("Filtreler")} · ${active}` : t("Filtreler");
+  fb.classList.toggle("on", active > 0);
+}
+
+/* A "?" section for long explanations; stays open across re-renders. */
+function help(el, label, body) {
+  const open = el.querySelector("details.help")?.open ? " open" : "";
+  return `<details class="help"${open}><summary>${t(label)}</summary>${body}</details>`;
+}
+
+/* Filters shared by both pages: hide rules, search, category, minimum listings, names only. */
+function passesCommon(r) {
+  if (!exclude.show_hidden && isHidden(r)) return false;
+  if (state.favOnly && !r.watched) return false;
+  if (r.count < state.minc) return false;
+  if (state.cat && r.category !== state.cat) return false;
+  const q = state.q.trim().toLocaleLowerCase("tr");
+  return !q || r.item_key.includes(q) || [r.name, r.official_name, r.category].some(s => (s || "").toLocaleLowerCase("tr").includes(q));
+}
+
+function renderDeals() {
+  const rules = dealsData.rules || {};
+  const rows = dealTable.sort(dealsData.items.filter(r => passesCommon(r) && !(state.hideSliding && r.deal.sliding)
+                                                         && !(state.profitOnly && !(r.deal.net_profit > 0))));
+  dealTable.renderHead();
+  renderWeek(dealsData.weekdays);
+  renderMorphs(dealsData.morphs || []);
+  const intro = document.getElementById("dealsIntro");
+  intro.innerHTML = t("Şu an normal fiyatının altında olan itemler: <b>{0}</b> öneri", rows.length) +
+    (rows.length !== dealsData.items.length ? t(" (filtrelerle {0} tanesi gizli)", dealsData.items.length - rows.length) : "") + "." +
+    help(intro, "Nasıl seçiliyor?",
+      t("Şu an <b>kendi 7 günlük ortalama fiyatının en az {0} altında</b> olan ve <b>son listelemede ya da 7 günde en az {1} düşen</b> itemler. " +
+        "En az {2} ilanı ve {3} günlük geçmişi olmalı; uydurma uç fiyatlar sayılmaz. " +
+        "Sıralama: indirim × 30 günün dibine yakınlık × ilan sayısı; bir haftadır düşüşte olanlar ani düşüşlerin arkasına alınır.",
+        pctRaw(rules.min_discount ?? 10), pctRaw(rules.min_drop ?? 5), rules.min_listings ?? 2, rules.min_days ?? 3));
+  document.getElementById("dealRows").innerHTML = rows.map((r, i) => {
+    const d = r.deal;
+    const name = r.name ? `<span class="nm ${gradeCls(r)}">${esc(r.name)}</span>` : `<span class="nm unnamed">${t("Adsız")}</span>`;
+    const sub = esc(r.category || "");
+    // One short line with what the columns don't show; the full reasons stay on hover.
+    const full = [...d.reasons, ...(d.warning ? d.warning.split(" · ").map(w => "⚠ " + w) : [])].join("\n");
+    const note = (d.note || []).map(n => n.warn ? `<span class="warn">⚠ ${esc(n.text)}</span>` : esc(n.text)).join(" · ");
+    return `<tr data-key="${r.item_key}">
+      <td class="rank">${i + 1}</td>
+      ${starCell(r)}
+      <td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt" title="${esc(full)}">${name}<span class="sub">${sub}</span>
+        ${note ? `<span class="note">${note}</span>` : ""}</div></div></td>
+      <td class="price">${fmt(r.price)}</td>
+      <td class="muted">${fmt(r.typical)}</td>
+      <td><span class="disc">${pct(d.discount)}</span><span class="save">${t("adet başı {0} ucuz", fmt(d.saving))}</span></td>
+      <td title="${fmt(r.typical)} × ${pctRaw(100 - (dealsData.fee_pct ?? 12))} − ${fmt(r.price)}"><span class="profit ${d.net_profit > 0 ? "pos" : "neg"}">${d.net_profit > 0 ? "+" : ""}${fmt(d.net_profit)}</span>
+        <span class="save">${t("{0} getiri", pct(d.profit_pct))}</span></td>
+      <td title="${t("30 günlük aralık (uç değerler hariç) {0} – {1}", fmt(r.low30), fmt(r.high30))}">
+        <span class="range"><i style="left:${(d.position * 100).toFixed(0)}%"></i></span>
+        <div class="range-l"><span>${fmt(r.low30)}</span><span>${fmt(r.high30)}</span></div></td>
+      <td>${chg(r.week.change, r.week.partial, r.week.ts)}</td>
+      <td class="muted">${r.count}</td>
+    </tr>`;
+  }).join("");
+  const empty = document.getElementById("dealsEmpty");
+  empty.hidden = rows.length > 0;
+  empty.textContent = t(dealsData.items.length ? "Filtrelere uyan öneri yok." : "Şu an bu kurallara uyan fırsat yok.");
+}
+
+const DAYS = { tr: ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"], en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] };
+
+function renderWeek(w) {
+  const el = document.getElementById("weekStrip");
+  el.hidden = !w;
+  if (!w) return;
+  el.innerHTML = w.by_day.map((v, i) => {
+    const cls = v == null ? "" : v === Math.min(...w.by_day.filter(x => x != null)) ? "cheap"
+              : v === Math.max(...w.by_day.filter(x => x != null)) ? "dear" : "";
+    return `<div class="d ${cls}"><div class="n">${DAYS[LANG][i]}</div><div class="v">${v == null ? "–" : (v > 0 ? "+" : "") + PF.format(v) + "%"}</div></div>`;
+  }).join("") + `<div class="cap">${t("Son 30 gün: en ucuz gün <b>{0}</b>, en pahalı gün <b>{1}</b>.", w.cheapest, w.dearest)}</div>`;
+}
+
+function renderMorphs(list) {
+  const fee = dealsData.fee_pct ?? 12;
+  const intro = document.getElementById("morphIntro");
+  intro.innerHTML = t("Odyle, aynı seviyedeki cevher, mücevher ve kütüğe 1:1 dönüştürülebilir.") +
+    help(intro, "Nasıl hesaplanıyor?",
+      `<b>${t("Üretim için")}</b>${t(": malzeme Odyle'dan pahalıysa Odyle alıp dönüştürmek daha ucuz.")} ` +
+      `<b>${t("Satış için")}</b>${t(": Odyle alıp dönüştürüp malzemeyi satınca market kesintisinden sonra kalan. Dönüştürmenin kendi maliyeti (varsa) hesaba katılmadı.")}`);
+  const cell = it => `<div class="item">${iconHtml(it.icon)}<div class="txt"><span class="nm ${gradeCls(it)}">${esc(it.name || it.item_key)}</span><span class="sub">${t("{0} ilan", it.count)}</span></div></div>`;
+  document.getElementById("morphRows").innerHTML = list.length ? list.map(m => `<tr>
+      <td class="l">${cell(m.material)}</td><td class="price">${fmt(m.material.price)}</td>
+      <td class="l">${cell(m.odyle)}</td><td class="price">${fmt(m.odyle.price)}</td>
+      <td><span class="profit ${m.craft_saving > 0 ? "pos" : "neg"}">${m.craft_saving > 0 ? t("Odyle al, {0} ucuz", fmt(m.craft_saving)) : t("malzemeyi al")}</span></td>
+      <td title="${fmt(m.material.price)} × ${pctRaw(100 - fee)} − ${fmt(m.odyle.price)}"><span class="profit ${m.sell_profit > 0 ? "pos" : "neg"}">${m.sell_profit > 0 ? "+" : ""}${fmt(m.sell_profit)}</span>
+        <span class="save">${pct(m.sell_profit_pct)}</span></td></tr>`).join("")
+    : `<tr><td colspan="6" class="empty">${t("Odyle ve malzemelerin güncel fiyatı yok.")}</td></tr>`;
+}
+
+/* ---------- inventory page ---------- */
+const SIGNAL_LABEL = { sell: "Sat", hold: "Bekle", normal: "Normal", check: "Kontrol et" };
+
+function renderInventory() {
+  const sig = state.invSignal || "";
+  document.querySelectorAll("#invSignal button").forEach(b => b.classList.toggle("on", b.dataset.g === sig));
+  const rows = invTable.sort(invData.items.filter(r => passesCommon(r) && (!sig || r.signal === sig)));
+  invTable.renderHead();
+  const sells = invData.items.filter(r => r.signal === "sell");
+  document.getElementById("i-total").textContent = invData.ts ? fmt(invData.total_value) : "–";
+  document.getElementById("i-total-s").textContent = t("{0} satılabilir item çeşidi · kesinti sonrası", invData.items.length);
+  document.getElementById("i-sell").textContent = sells.length ? fmt(invData.sell_value) : "–";
+  document.getElementById("i-sell-s").textContent = t('{0} item "Sat" önerisinde', sells.length);
+  document.getElementById("i-ts").textContent = invData.ts ? fmtTime(invData.ts) : t("henüz yok");
+  const w = invData.weekdays;
+  document.getElementById("i-day").textContent = w ? w.dearest : "–";
+  document.getElementById("i-day-s").textContent = w ? t("fiyatlar en yüksek; en düşük {0} (fark {1})", w.cheapest, pct(w.spread)) : " ";
+  document.getElementById("invRows").innerHTML = rows.map(r => {
+    const name = r.name ? `<span class="nm ${gradeCls(r)}">${esc(r.name)}</span>` : `<span class="nm unnamed">${t("Adsız")}</span>`;
+    const prem = r.premium == null ? `<span class="na">–</span>`
+      : `<span class="chg ${r.premium > 0.05 ? "up" : r.premium < -0.05 ? "down" : "flat"}"><span class="p">${r.premium > 0 ? "+" : ""}${pct(r.premium)}</span></span>`;
+    return `<tr data-key="${r.item_key}">
+      ${starCell(r)}
+      <td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${esc(r.category || "")}</span></div></div></td>
+      <td class="price">${fmt(r.owned)}</td>
+      <td class="price">${r.suspect ? `<span class="warn" title="${t("En ucuz ilan 30 günlük fiyatlara göre uç değerde")}">⚠</span> ` : ""}${fmt(r.price)}</td>
+      <td class="muted">${fmt(r.typical)}</td>
+      <td>${prem}</td>
+      <td>${chg(r.prev.change)}</td>
+      <td>${chg(r.week.change, r.week.partial, r.week.ts)}</td>
+      <td class="price">${fmt(r.value_net)}</td>
+      <td class="l"><span class="badge ${r.signal}">${t(SIGNAL_LABEL[r.signal])}</span>
+        ${r.signal === "sell" || r.signal === "check" ? `<span class="muted" style="font-size:12px"> ${t("{0}'den listele", fmt(r.suggest_price))}</span>` : ""}
+        <span class="why">${esc(r.why)}</span></td>
+    </tr>`;
+  }).join("");
+  const empty = document.getElementById("invEmpty");
+  empty.hidden = rows.length > 0;
+  empty.textContent = t(!invData.ts ? "Envanter henüz yok. Oyuna giriş yaptığında kendiliğinden gelir."
+    : "Filtrelere uyan item yok.");
+  const up = invData.unpriced || [];
+  const invFoot = document.getElementById("invFoot");
+  invFoot.innerHTML = help(invFoot, "Öneriler nasıl hesaplanıyor?",
+    t('"Sat": fiyat 7 gün ortalamasının en az %10 üstünde ya da 7 günde en az %15 yükselmiş. "Bekle": 7 gün ortalamasının en az %10 altında. ') +
+    t("Önerilen fiyat, en ucuz ilanın 1 altı (en ucuz ilan uydurmaysa 7 gün ortalaması). Market kesintisi {0}. ", pctRaw(invData.fee_pct ?? 12)) +
+    (up.length ? t("Markette şu an ilanı olmayan {0} item listede yok: {1}.", up.length,
+                   up.slice(0, 6).map(u => esc(u.name || u.item_key) + " ×" + u.count).join(", ") + (up.length > 6 ? "…" : "")) : ""));
+}
+
+/* ---------- favorites page ---------- */
+const toTarget = r => r.target && r.price ? (r.price - r.target) / r.target * 100 : null;   // ≤ 0: at or under target
+let favOwned = {};
+// Status badge and its rank (most urgent first) for the favorites table.
+function favStatus(r) {
+  const gap = toTarget(r);
+  if (!r.listed) return [4, `<span class="badge hold">${t("Markette yok")}</span>`];
+  if (gap != null && gap <= 0) return [0, `<span class="badge sell">${t("Hedefin altında")}</span>`];
+  if (r.typical && r.price <= r.typical * 0.8) return [1, `<span class="badge sell">${t("7 gün ort. {0} altında", pctRaw(20))}</span>`];
+  return r.target ? [2, `<span class="badge normal">${t("Bekleniyor")}</span>`] : [3, `<span class="badge normal">${t("İzleniyor")}</span>`];
+}
+
+function renderFavorites() {
+  const kind = state.favKind || "";
+  document.querySelectorAll("#favKind button").forEach(b => b.classList.toggle("on", b.dataset.g === kind));
+  const owned = favOwned = Object.fromEntries((invData.items || []).map(r => [r.item_key, r.owned]));
+  const favs = data.items.filter(r => r.watched);
+  const rows = favTable.sort(favs.filter(r => passesCommon(r) && (kind !== "target" || r.target) && (kind !== "none" || !r.target)));
+  favTable.renderHead();
+  document.getElementById("favRows").innerHTML = rows.map(r => {
+    const name = r.name ? `<span class="nm ${gradeCls(r)}">${esc(r.name)}</span>` : `<span class="nm unnamed">${t("Adsız")}</span>`;
+    const gap = toTarget(r);
+    const gapCell = gap == null ? `<span class="na">–</span>`
+      : gap <= 0 ? `<span class="profit pos">${t("{0} altında", pct(-gap))}</span>`
+      : `<span class="muted">${t("{0} üstünde", pct(gap))}</span><span class="save">${t("{0} fark", fmt(r.price - r.target))}</span>`;
+    const status = favStatus(r)[1];
+    return `<tr data-key="${r.item_key}">
+      ${starCell(r)}
+      <td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${esc(r.category || "")}</span></div></div></td>
+      <td class="price">${r.suspect ? `<span class="warn" title="${t("En ucuz ilan 30 günlük fiyatlara göre uç değerde")}">⚠</span> ` : ""}${fmt(r.price)}</td>
+      <td class="price">${r.target ? fmt(r.target) : `<span class="na">${t("yok")}</span>`}</td>
+      <td>${gapCell}</td>
+      <td class="muted">${fmt(r.typical)}</td>
+      <td>${chg(r.prev.change)}</td>
+      <td>${chg(r.week.change, r.week.partial, r.week.ts)}</td>
+      <td>${chg(r.month.change, r.month.partial, r.month.ts)}</td>
+      <td class="muted">${r.count}</td>
+      <td class="muted">${owned[r.item_key] ? fmt(owned[r.item_key]) : "–"}</td>
+      <td class="l">${status}</td>
+    </tr>`;
+  }).join("");
+  const favFoot = document.getElementById("favFoot");
+  favFoot.innerHTML = t("Hedef fiyatı değiştirmek için satıra tıkla.") + help(favFoot, "Bildirim ne zaman gelir?",
+    t("Hedefi olan item hedefin altına inince bildirim gelir; hedefsiz favoriler 7 gün ortalamasının %20 altına inince bildirilir."));
+  const empty = document.getElementById("favEmpty");
+  empty.hidden = rows.length > 0;
+  empty.textContent = t(favs.length ? "Filtrelere uyan favori yok."
+    : "Henüz favorin yok. Diğer sayfalarda bir item'ın ☆ işaretine tıkla ya da item'ı açıp hedef fiyat gir.");
+}
+
+/* ---------- crafting page ---------- */
+const money = v => v == null ? `<span class="na">–</span>` : fmt(v);
+const profitCell = v => v == null ? `<span class="na">–</span>`
+  : `<span class="profit ${v > 0 ? "pos" : "neg"}">${v > 0 ? "+" : ""}${fmt(v)}</span>`;
+
+function renderCraft() {
+  const fee = craftData.fee_pct ?? 12;
+  const craftIntro = document.getElementById("craftIntro");
+  craftIntro.innerHTML = t("Her kademe için en ucuz yol: marketten <b>al</b> ya da bir önceki kademenin en ucuz yolundan <b>üret</b>.") +
+    help(craftIntro, "Nasıl hesaplanıyor?", t("Üretim maliyeti = bir denemenin malzemesi × beklenen deneme sayısı (her adımda %25 kombo ihtimali; 4. adımın normal sonucu ~1,06 denemede). " +
+      "Malzeme, Odyle'dan dönüştürmek daha ucuzsa öyle hesaplanır (mor). Kâr, market kesintisi ({0}) düşüldükten sonra. " +
+      "Tarifler ve oranlar topluluğun crafting tablosundan (Mastery 100); şansa bağlı olduğundan gerçek maliyet sapabilir. Fiyatlar şu anki market listesi.",
+      pctRaw(fee)));
+  const named = x => `<div class="item">${iconHtml(x.icon)}<div class="txt"><span class="nm ${gradeCls(x)}">${esc(x.name)}</span>` +
+    `<span class="sub">${x.listings ? t("{0} ilan", x.listings) : t("markette yok")}</span></div></div>`;
+  document.getElementById("craftBest").innerHTML = craftData.best_sales.length
+    ? craftData.best_sales.slice(0, 8).map(x => `<tr data-key="${x.item_key}">
+        <td class="l">${named(x)}</td><td class="muted">${t("{0} · {1}. adım", x.slot, x.step)}</td>
+        <td>${money(x.craft_cost)}</td><td class="price">${money(x.market_price)}</td>
+        <td>${profitCell(x.sell_profit)}<span class="save">${pct(x.profit_pct)}</span></td></tr>`).join("")
+    : `<tr><td colspan="5" class="empty">${t("Şu an üretip satınca kâr eden kademe yok.")}</td></tr>`;
+  const matLine = m => m.price == null
+    ? `<span class="miss">${m.qty}× ${esc(m.name)}${t(" (fiyat yok)")}</span>`
+    : `<span class="${m.via === "odyle" ? "odyle" : ""}" title="${t(m.via === "odyle" ? "Odyle'dan dönüştürmek daha ucuz" : "Marketten")}">${m.qty}× ${esc(m.name)} ${fmt(m.price)}${m.via === "odyle" ? " (Odyle)" : ""}</span>`;
+  const tierRow = (st, x, normal) => `<tr data-key="${x.item_key}" class="${normal ? "normal" : ""}">
+      <td class="rank">${normal ? "" : st.step}</td>
+      <td class="l">${named(x)}${normal ? "" : `<div class="mats">${st.materials.map(matLine).join("")}</div>`}</td>
+      <td>${money(x.attempt_cost)}<span class="save">× ${t("{0} deneme", PF.format(x.tries))}${normal ? t(" (normal sonuç)") : ""}</span></td>
+      <td>${money(x.craft_cost)}</td><td class="price">${money(x.market_price)}</td>
+      <td>${x.best ? `<span class="badge ${x.best}">${t(x.best === "buy" ? "Al" : "Üret")}</span> ${money(x.cost)}` : `<span class="na">–</span>`}</td>
+      <td>${profitCell(x.sell_profit)}</td></tr>`;
+  document.getElementById("craftChains").innerHTML = craftData.chains.map(c => `<div class="chain">
+      <div class="ch"><h2>${c.slot}</h2><span class="muted">${c.profession}</span><span class="route">${t("En ucuz yol: {0}", esc(c.route))}</span></div>
+      <div class="tablebox"><table class="deals">
+        <thead><tr><th>${t("Adım")}</th><th class="l">${t("Sonuç ve bir denemenin malzemesi")}</th><th>${t("Bir deneme")}</th>
+          <th title="${t("Önceki kademenin en ucuz yolu + bu adımın beklenen malzemesi")}">${t("Üretim maliyeti")}</th><th>${t("Market fiyatı")}</th>
+          <th>${t("En ucuz yol")}</th><th title="${t("Üretip satarsan, kesinti sonrası")}">${t("Üret-sat kârı")}</th></tr></thead>
+        <tbody>${c.steps.map(st => tierRow(st, st.result, false) + (st.normal_result ? tierRow(st, st.normal_result, true) : "")).join("")}</tbody>
+      </table></div></div>`).join("");
+}
+
+function setTitle() {
+  const page = { deals: "Fırsatlar", craft: "Üretim", inv: "Envanterim", fav: "Favoriler" }[state.view];
+  document.title = page ? `${t(page)} · Aion 2 Market` : "Aion 2 Market";
+}
+
+function setView(v) {
+  state.view = v; save();
+  const deals = v === "deals", craft = v === "craft", inv = v === "inv", fav = v === "fav";
+  const changes = !deals && !craft && !inv && !fav;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  document.getElementById("changesView").hidden = !changes;
+  document.getElementById("cards").hidden = !changes;
+  document.getElementById("toolbar").hidden = craft;
+  document.getElementById("craftView").hidden = !craft;
+  document.getElementById("dealsView").hidden = !deals;
+  document.getElementById("invView").hidden = !inv;
+  document.getElementById("favView").hidden = !fav;
+  document.getElementById("favOnly").parentElement.hidden = fav;
+  document.getElementById("period").hidden = !changes;
+  document.getElementById("dir").hidden = !changes;
+  document.getElementById("hideEmpty").parentElement.hidden = !changes;
+  document.getElementById("slidingBox").hidden = !deals;
+  setTitle();
+  closeDrawer();
+  refresh();
+}
+
+function renderChanges() {
+  renderHead();
+  const rows = sorted(filtered());
+  const tb = document.getElementById("rows");
+  tb.innerHTML = rows.map(r => {
+    const name = r.name
+      ? `<span class="nm ${gradeCls(r)}" title="${esc(r.official_name || "")}">${esc(r.name)}${r.custom_name ? `<span class="custom" title="${t("Senin verdiğin ad")}">●</span>` : ""}</span>`
+      : `<span class="nm unnamed">${t("Adsız")}</span>`;
+    const sub = esc(r.category || "");
+    const ap = id => id === state.period ? "active-period" : "";
+    return `<tr data-key="${r.item_key}" class="${r.listed ? "" : "stale"} ${selected === r.item_key ? "sel" : ""}">
+      ${starCell(r)}
+      <td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${sub}</span></div></div></td>
+      <td class="price">${r.suspect ? `<span class="warn" title="${r.suspect === "high"
+          ? t("Son 30 günün fiyatlarının çok üstünde (7 gün ort. {0}); büyük ihtimalle tek bir uydurma ilan. Değişim gösterilmiyor.", fmt(r.typical))
+          : t("Son 30 günün fiyatlarının çok altında (7 gün ort. {0}); fırsat da olabilir, hatalı ilan da.", fmt(r.typical))}">⚠</span> ` : ""}${fmt(r.price)}</td>
+      <td class="${ap("prev")}" title="${t("Önceki: {0} · {1}", fmt(r.prev.price), fmtTime(r.prev.ts))}">${chg(r.prev.change)}</td>
+      <td class="${ap("week")}" title="${t("7 gün önce: {0} · {1}", fmt(r.week.price), fmtTime(r.week.ts))}">${chg(r.week.change, r.week.partial, r.week.ts)}</td>
+      <td class="${ap("month")}" title="${t("30 gün önce: {0} · {1}", fmt(r.month.price), fmtTime(r.month.ts))}">${chg(r.month.change, r.month.partial, r.month.ts)}</td>
+      <td class="muted" title="${r.count ? "" : t("Son market listesinde yok. Son görüldüğünde {0} ilan, {1}", r.last_count, fmtTime(r.ts))}">${r.count}</td>
+      <td>${spark(r.spark)}</td>
+      <td class="muted" title="${fmtTime(r.ts)}">${ago(r.ts)}</td>
+    </tr>`;
+  }).join("");
+  const empty = document.getElementById("empty");
+  empty.hidden = rows.length > 0;
+  empty.textContent = t(data.items.length ? "Filtrelere uyan item yok."
+    : (servers.npcap || {}).installed === false
+      ? "Henüz fiyat yok. Oyundaki pazar fiyatlarını kaydetmek için Npcap gerekli; sağ üstteki bağlantıdan indirebilirsin."
+      : "Henüz fiyat yok. Oyunda pazarı aç ya da bir item ara; fiyatlar burada görünür.");
+  renderCards(rows);
+}
+
+function renderCards(rows) {
+  const listed = data.items.filter(r => r.listed);
+  document.getElementById("c-count").textContent = NF.format(listed.length);
+  document.getElementById("c-count-s").textContent = t("toplam {0} item kayıtlı", NF.format(data.items.length));
+  const p = state.period;
+  const downs = rows.filter(r => r[p].change < 0);
+  document.getElementById("c-down").textContent = NF.format(downs.length);
+  document.getElementById("c-down-s").textContent = t("{0} · görünen {1} item içinde", t(PERIOD_LABEL[p]), NF.format(rows.length));
+  const top = downs.slice().sort((a, b) => a[p].change - b[p].change)[0];
+  document.getElementById("c-top").textContent = top ? pct(Math.abs(top[p].change)) : "–";
+  document.getElementById("c-top-s").textContent = top ? `${top.name || t("Adsız") + " " + top.item_key} · ${fmt(top[p].price)} → ${fmt(top.price)}` : t("düşen item yok");
+  document.getElementById("c-last").textContent = data.latest ? fmtTime(data.latest) : "–";
+  document.getElementById("c-last-s").textContent = data.first ? t("kayıtlar {0} tarihinden beri", fmtDate(data.first)) : " ";
+  const days = data.first ? (data.now - data.first) / 86400 : 0;
+  const foot = document.getElementById("foot");
+  foot.innerHTML = help(foot, "Bu tablo hakkında",
+    t("Fiyatlar birim fiyattır (Kinah). “Son listeleme” bir önceki market açılışıyla karşılaştırır. ") +
+    (days < 30 ? t("<b>*</b> Kayıtlar {0} günlük; daha kısa sürenin değişimi gösteriliyor. ", PF.format(days)) : "") +
+    t("Soluk satırlar en son market listesinde yer almayan (0 ilanlı) itemler; her zaman en altta gösterilir, fiyatları son görüldükleri andan."));
+}
+
+let servers = { servers: [], home: null, sync: {} };
+const serverLabel = s => `${s.name || t("Sunucu {0}", s.server_id)}${s.mine ? t(" (senin)") : ""} · ${t("{0} item", NF.format(s.items))}`;
+
+async function loadServers() {
+  servers = await (await fetch("/api/servers", { cache: "no-store" })).json();
+  const ids = servers.servers.map(s => s.server_id);
+  if (!ids.includes(state.server)) state.server = servers.home || ids[0] || null;
+  const sel = document.getElementById("server");
+  sel.innerHTML = servers.servers.map(s => `<option value="${s.server_id}">${esc(serverLabel(s))}</option>`).join("");
+  sel.value = state.server ?? "";
+  document.querySelector("header .server").hidden = servers.servers.length < 2;
+  const sy = servers.sync || {}, el = document.getElementById("sync");
+  el.parentElement.hidden = !sy.configured;           // no shared store built in: nothing to switch
+  el.className = "sync" + (!sy.enabled ? "" : sy.last_error ? " err" : sy.last_ok ? " ok" : "");
+  el.textContent = !sy.enabled ? t("Ortak veri: kapalı")
+    : sy.last_error ? t("Ortak veri hatası: {0}", sy.last_error)
+    : sy.last_ok ? t("Ortak veri: eşitlendi {0}", ago(sy.last_ok)) : t("Ortak veri: bekleniyor");
+  el.title = t("Ortak veri ayarı");
+  document.getElementById("syncOn").checked = !!sy.enabled;
+  const np = servers.npcap || {}, nel = document.getElementById("npcap");
+  nel.className = "npcap " + (np.installed ? "ok" : "off");
+  nel.textContent = np.installed ? t("Npcap kurulumu aktif") : t("Npcap kurulu değil · indir");
+  nel.title = np.installed ? t("Oyunda açtığın pazar aramaları anında kaydediliyor.")
+    : t("Npcap kurarsan oyunda açtığın pazar aramaları anında kaydedilir; en güncel fiyatlar böyle gelir.");
+  if (np.installed) nel.removeAttribute("href"); else nel.href = np.url;
+}
+
+async function refresh() {
+  try {
+    await loadServers();
+    exclude = (await (await fetch("/api/settings", { cache: "no-store" })).json()).exclude;
+    const qs = "?lang=" + LANG + (state.server ? "&server=" + state.server : "");
+    const r = await fetch(`/api/items${qs}`, { cache: "no-store" });
+    data = await r.json();
+    if (state.view === "deals") dealsData = await (await fetch(`/api/deals${qs}`, { cache: "no-store" })).json();
+    if (state.view === "craft") craftData = await (await fetch(`/api/crafting${qs}`, { cache: "no-store" })).json();
+    if (state.view === "inv" || state.view === "fav") invData =await (await fetch(`/api/inventory${qs}`, { cache: "no-store" })).json();
+    fillCategories();
+    document.getElementById("status").textContent = t("Güncellendi {0}", new Date().toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    render();
+    if (selected) openItem(selected, true);
+  } catch (e) {
+    document.getElementById("status").textContent = t("Sunucuya ulaşılamıyor");
+  }
+}
+
+function fillCategories() {
+  const counts = {};
+  data.items.forEach(r => { if (r.category) counts[r.category] = (counts[r.category] || 0) + 1; });
+  const cats = Object.keys(counts).sort((a, b) => a.localeCompare(b, "tr"));
+  const sel = document.getElementById("cat");
+  sel.innerHTML = `<option value="">${t("Tüm kategoriler")}</option>` +
+    cats.map(c => `<option value="${esc(c)}">${esc(c)} (${counts[c]})</option>`).join("");
+  sel.value = cats.includes(state.cat) ? state.cat : "";
+  syncCatReset();
+}
+
+function syncCatReset() {
+  const sel = document.getElementById("cat");
+  document.getElementById("catReset").hidden = !sel.value;
+  sel.classList.toggle("on", !!sel.value);
+}
+
+/* ---------- detail drawer ---------- */
+const drawer = document.getElementById("drawer"), scrim = document.getElementById("scrim");
+
+function closeDrawer() {
+  selected = null;
+  drawer.classList.remove("on"); scrim.classList.remove("on");
+  drawer.setAttribute("aria-hidden", "true");
+  render();
+}
+
+async function openItem(key, quiet) {
+  selected = key;
+  const row = data.items.find(r => r.item_key === key);
+  const d = await (await fetch(`/api/item/${key}?lang=${LANG}${state.server ? "&server=" + state.server : ""}`, { cache: "no-store" })).json();
+  if (quiet && document.activeElement && drawer.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;
+  const statBox = (k, x) => x ? `<div class="stat"><div class="k">${k}</div><div class="v">${chg(x.change, x.partial, x.ts)}</div><div class="s">${fmt(x.price)} · ${fmtTime(x.ts)}</div></div>` : "";
+  const since30 = Date.now() / 1000 - 30 * 86400;
+  // Outliers (bogus listings far from the 30-day median) stay out of the chart and the low/high.
+  const tp = d.typical, normal = v => !tp || (v >= tp.low && v <= tp.high);
+  const clip = v => tp ? Math.min(tp.high, Math.max(tp.low, v)) : v;
+  const shownHistory = d.history.filter(h => normal(h[1]));
+  const shownRanges = (d.ranges || []).map(r => [r[0], r[1], clip(r[2]), clip(r[3]), ...r.slice(4)]);
+  const hiddenPoints = d.history.length - shownHistory.length;
+  const ranges30 = shownRanges.filter(r => r[0] >= since30);
+  const prices30 = [...shownHistory.filter(h => h[0] >= since30).map(h => h[1]),
+                    ...ranges30.map(r => r[2]), ...ranges30.map(r => r[3])];       // band extremes count too
+  const lst = d.listings;
+  drawer.innerHTML = `
+    <div class="top">
+      ${iconHtml(d.info && d.info.icon, true)}
+      <div>
+        <div class="brand">Item ${esc(key)}</div>
+        <h2 class="${gradeCls(d.info)}">${d.name ? esc(d.name) : `<span class="muted">${t("Adsız item")}</span>`}</h2>
+        ${d.info ? `<div style="margin-top:4px"><span class="chip ${gradeCls(d.info)}">${esc(d.info.grade_name || "")}</span><span class="muted">${esc(d.info.category || "")}</span></div>` : ""}
+      </div>
+      <button class="x" id="dx" title="${t("Kapat")}">✕</button>
+    </div>
+    <div class="namebox">
+      <input id="nm" placeholder="${d.info && d.info.name ? esc(d.info.name) : t("Bu item'a bir ad ver")}" value="${d.custom_name ? esc(d.name) : ""}" maxlength="80">
+      <button class="btn" id="nmsave">${t("Kaydet")}</button>
+    </div>
+    <div class="hint">${!d.info || !d.info.name
+      ? t("Resmi item verisinde ve aion2.exchange'de bu item'ın adı yok; adını sen verebilirsin.")
+      : d.info.source === "aion2.exchange"
+        ? t("Ad aion2.exchange'den: <b>{0}</b> (NCSoft'un resmi verisinde yok). İstersen kendi adını ver; boş bırakıp kaydedersen bu ada döner.", esc(d.info.name))
+        : t("Resmi ad: <b>{0}</b>. İstersen kendi adını ver; boş bırakıp kaydedersen resmi ada döner.", esc(d.info.name))}</div>
+    <div class="bigprice">${row ? fmt(row.price) : "–"} <small>${t("Kinah / adet")} · ${row ? t("{0} ilan", row.count) : ""} · ${row ? ago(row.ts) : ""}</small></div>
+    ${row && row.suspect ? `<div class="hint"><span class="warn">⚠</span> ${row.suspect === "high"
+      ? t("Son 30 günün fiyatlarının çok üstünde (7 gün ort. {0}); büyük ihtimalle tek bir uydurma ilan, değişim hesaplanmadı.", fmt(row.typical))
+      : t("Son 30 günün fiyatlarının çok altında (7 gün ort. {0}); fırsat da olabilir, hatalı ilan da.", fmt(row.typical))}</div>` : ""}
+    ${row ? `<div class="stats">${statBox(t("Son listeleme"), row.prev)}${statBox(t("7 gün"), row.week)}${statBox(t("30 gün"), row.month)}</div>` : ""}
+    <div class="chart" id="chart"></div>
+    ${prices30.length ? `<div class="hint" style="margin-top:6px">${t("30 gün en düşük {0} · en yüksek {1} · {2} kayıt", fmt(Math.min(...prices30)), fmt(Math.max(...prices30)), d.history.length)}${ranges30.length ? t(" · camgöbeği bant: 6 saatlik en düşük–en yüksek (aion2.exchange)") : ""}${
+      hiddenPoints ? t(" · {0} uç değer (30 günlük medyan {1}'in ×{2} üstü ya da ¼ altı) gösterilmedi", hiddenPoints, fmt(tp.median), (tp.high / tp.median).toFixed(0)) : ""}</div>` : ""}
+    ${d.weekdays ? `<h3>${t("Haftalık düzen (bu item)")}</h3><div class="week" style="margin-bottom:4px">${d.weekdays.by_day.map((v, i) =>
+        `<div class="d ${v != null && d.weekdays.cheapest_day === i ? "cheap"
+          : v != null && d.weekdays.dearest_day === i ? "dear" : ""}">
+          <div class="n">${DAYS[LANG][i]}</div><div class="v">${v == null ? "–" : (v > 0 ? "+" : "") + PF.format(v) + "%"}</div></div>`).join("")}</div>
+      <div class="hint">${t("En ucuz <b>{0}</b>, en pahalı <b>{1}</b> (fark {2}). Son 30 güne dayanır; her gün için birkaç örnek var, kesin değildir.", d.weekdays.cheapest, d.weekdays.dearest, pct(d.weekdays.spread))}</div>` : ""}
+    <div class="actions" style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
+      <button class="btn" id="hideOne">${t(exclude.items.includes(key) ? "Listede tekrar göster" : "⊘ Listede gösterme")}</button>
+      ${row && !exclude.items.includes(key) && exclude.rules.some(rule => ruleMatches(rule, row))
+        ? `<span class="hint">${t("Bu item bir gizleme kuralına uyuyor.")}</span>` : ""}
+    </div>
+    <h3>${t("Favori ve hedef fiyat")}</h3>
+    <div class="watch">
+      <input id="tg" type="number" min="0" placeholder="${t("Hedef birim fiyat")}" value="${d.watch && d.watch.target != null ? d.watch.target : ""}">
+      <button class="btn gold" id="wsave">${t(d.watch ? "Hedefi kaydet" : "★ Favorilere ekle")}</button>
+      ${d.watch ? `<button class="btn" id="wdel">${t("Favorilerden çıkar")}</button>` : ""}
+    </div>
+    <div class="hint" style="margin-top:6px">${t("Hedef fiyat girersen fiyat hedefin altına inince, girmezsen 7 gün ortalamasının %20 altına inince bildirim gelir.")}</div>
+    <h3>${t("Son aramadaki ilanlar")}</h3>
+    ${lst.rows.length ? `<div class="hint">${fmtTime(lst.ts)} · ${t("{0} ilan", lst.total)}</div>
+      <table class="mini"><tr><th class="l">${t("Adet")}</th><th>${t("Toplam")}</th><th>${t("Birim")}</th></tr>
+      ${lst.rows.map(r => `<tr><td class="l">${r[0]}</td><td>${fmt(r[1])}</td><td class="price">${fmt(r[2])}</td></tr>`).join("")}</table>`
+      : `<div class="hint">${t("Bu item oyunda henüz aranmadı. Aradığında ilanlar burada görünür.")}</div>`}
+  `;
+  drawChart(document.getElementById("chart"), shownHistory, shownRanges);
+  document.getElementById("dx").onclick = closeDrawer;
+  document.getElementById("nmsave").onclick = () => {
+    const v = document.getElementById("nm").value.trim();
+    post("/api/name", { item_key: key, name: v }, t(v ? "Ad kaydedildi" : (d.info ? "Resmi ada dönüldü" : "Ad silindi")));
+  };
+  document.getElementById("nm").onkeydown = e => { if (e.key === "Enter") document.getElementById("nmsave").click(); };
+  document.getElementById("wsave").onclick = () => post("/api/watch", { item_key: key, target: document.getElementById("tg").value }, t(d.watch ? "Hedef kaydedildi" : "Favorilere eklendi"));
+  document.getElementById("hideOne").onclick = () => {
+    const hiding = !exclude.items.includes(key);
+    exclude.items = hiding ? [...exclude.items, key] : exclude.items.filter(k => k !== key);
+    saveExclude(t(hiding ? "Listeden gizlendi" : "Listede tekrar gösteriliyor")).then(() => openItem(key, true));
+  };
+  const del = document.getElementById("wdel");
+  if (del) del.onclick = () => post("/api/watch", { item_key: key, watch: false }, t("Favorilerden çıkarıldı"));
+  if (!quiet) {
+    drawer.classList.add("on"); scrim.classList.add("on");
+    drawer.setAttribute("aria-hidden", "false");
+    drawer.scrollTop = 0;
+    render();
+  }
+}
+
+function drawChart(box, history, ranges = []) {
+  if (history.length < 2) {
+    box.innerHTML = `<div class="hint" style="padding:30px 0;text-align:center">${t("Grafik için en az iki kayıt gerekli.")}</div>`;
+    return;
+  }
+  const W = 480, H = 190, L = 58, R = 10, T = 12, B = 24;
+  // ranges: [ts, span, low, high, avg, close, listings] — drawn as a low–high band behind the price line
+  const xs = [...history.map(h => h[0]), ...ranges.map(r => r[0]), ...ranges.map(r => r[0] + r[1])];
+  const ys = [...history.map(h => h[1]), ...ranges.map(r => r[2]), ...ranges.map(r => r[3])];
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), lo = Math.min(...ys), hi = Math.max(...ys);
+  const pad = (hi - lo) * 0.12 || hi * 0.02 || 1;
+  const yl = lo - pad, yh = hi + pad;
+  const X = t => L + (t - x0) / ((x1 - x0) || 1) * (W - L - R);
+  const Y = v => T + (1 - (v - yl) / (yh - yl)) * (H - T - B);
+  const pts = history.map(h => [X(h[0]), Y(h[1])]);
+  const line = pts.map(p => p.map(n => n.toFixed(1)).join(",")).join(" ");
+  const area = `${L},${H - B} ${line} ${(W - R)},${H - B}`;
+  const ticks = [hi, (hi + lo) / 2, lo].map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#323a5c" stroke-dasharray="3 4"/>` +
+    `<text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" fill="#9ba3c2" font-size="11">${fmt(v)}</text>`).join("");
+  const mid = r => X(r[0] + r[1] / 2);
+  const band = ranges.length > 1
+    ? `<polygon points="${[...ranges.map(r => `${mid(r).toFixed(1)},${Y(r[3]).toFixed(1)}`),
+                          ...ranges.slice().reverse().map(r => `${mid(r).toFixed(1)},${Y(r[2]).toFixed(1)}`)].join(" ")}"
+         fill="rgba(134,211,227,.12)" stroke="rgba(134,211,227,.35)" stroke-width="1" vector-effect="non-scaling-stroke"/>`
+    : "";
+  const rangeAt = t => ranges.find(r => t >= r[0] && t <= r[0] + r[1]);
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e7c47c" stop-opacity=".25"/><stop offset="1" stop-color="#e7c47c" stop-opacity="0"/></linearGradient></defs>
+      ${ticks}
+      ${band}
+      <polygon points="${area}" fill="url(#g)"/>
+      <polyline points="${line}" fill="none" stroke="#e7c47c" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      <text x="${L}" y="${H - 6}" fill="#9ba3c2" font-size="11">${fmtTime(x0)}</text>
+      <text x="${W - R}" y="${H - 6}" fill="#9ba3c2" font-size="11" text-anchor="end">${fmtTime(x1)}</text>
+      <circle id="dot" r="4" fill="#e7c47c" stroke="#121626" stroke-width="2" style="display:none"/>
+    </svg><div class="tip" id="tip"></div>`;
+  const svg = box.querySelector("svg"), dot = box.querySelector("#dot"), tip = box.querySelector("#tip");
+  svg.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect(), mx = (e.clientX - r.left) / r.width * W;
+    let i = 0;
+    pts.forEach((p, j) => { if (Math.abs(p[0] - mx) < Math.abs(pts[i][0] - mx)) i = j; });
+    dot.setAttribute("cx", pts[i][0]); dot.setAttribute("cy", pts[i][1]); dot.style.display = "";
+    tip.style.display = "block";
+    tip.style.left = (pts[i][0] / W * r.width + 10) + "px";
+    tip.style.top = (pts[i][1] / H * r.height + 10) + "px";
+    const rg = rangeAt(history[i][0]) || rangeAt(history[i][0] - 1);
+    tip.textContent = `${fmt(history[i][1])} · ${t("{0} ilan", history[i][2])} · ${fmtTime(history[i][0])}` +
+      (rg ? t(" · aralık {0}–{1}", fmt(rg[2]), fmt(rg[3])) : "");
+  });
+  svg.addEventListener("mouseleave", () => { dot.style.display = "none"; tip.style.display = "none"; });
+}
+
+async function post(url, body, okMsg) {
+  try {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(r.status);
+    toast(okMsg);
+    await refresh();
+  } catch (e) {
+    toast(t("Kaydedilemedi"));
+  }
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), 1800);
+}
+
+/* ---------- wiring ---------- */
+function setPeriod(p) {
+  state.period = p; state.sort = p; state.asc = true; save();
+  document.querySelectorAll("#period button").forEach(b => b.classList.toggle("on", b.dataset.p === p));
+  render();
+}
+document.querySelectorAll("#period button").forEach(b => b.onclick = () => setPeriod(b.dataset.p));
+document.getElementById("head").onclick = e => {
+  const th = e.target.closest("th"); if (!th) return;
+  const col = COLS.find(c => c.id === th.dataset.col); if (!col || col.nosort) return;
+  if (state.sort === col.id) state.asc = !state.asc; else { state.sort = col.id; state.asc = true; }
+  save(); render();
+};
+// A click on the star toggles the favorite; anywhere else on the row opens the detail panel.
+const rowClick = e => {
+  const star = e.target.closest("[data-star]");
+  if (star) return toggleFavorite(star.dataset.star);
+  const tr = e.target.closest("tr");
+  if (tr) openItem(tr.dataset.key);
+};
+document.getElementById("rows").onclick = rowClick;
+document.getElementById("dealRows").onclick = rowClick;
+document.getElementById("invRows").onclick = rowClick;
+document.getElementById("favRows").onclick = rowClick;
+document.querySelectorAll("#favKind button").forEach(b => b.onclick = () => { state.favKind = b.dataset.g; save(); render(); });
+document.querySelectorAll("#invSignal button").forEach(b => b.onclick = () => { state.invSignal = b.dataset.g; save(); render(); });
+document.getElementById("craftView").onclick = e => { const tr = e.target.closest("tr[data-key]"); if (tr) openItem(tr.dataset.key); };
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { if (state.view !== b.dataset.view) setView(b.dataset.view); });
+const bind = (id, key, get) => { const el = document.getElementById(id); el.addEventListener("input", () => { state[key] = get(el); save(); render(); }); };
+bind("q", "q", el => el.value);
+bind("dir", "dir", el => el.value);
+bind("cat", "cat", el => el.value);
+document.getElementById("cat").addEventListener("input", syncCatReset);
+document.getElementById("catReset").onclick = () => {
+  document.getElementById("cat").value = "";
+  state.cat = ""; save(); syncCatReset(); render();
+};
+bind("minc", "minc", el => Math.max(0, +el.value || 0));
+bind("hideEmpty", "hideEmpty", el => el.checked);
+bind("hideSliding", "hideSliding", el => el.checked);
+document.getElementById("hideSliding").checked = state.hideSliding;
+bind("favOnly", "favOnly", el => el.checked);
+document.getElementById("favOnly").checked = !!state.favOnly;
+bind("profitOnly", "profitOnly", el => el.checked);
+document.getElementById("profitOnly").checked = !!state.profitOnly;
+const dealTable = sortableTable("dealHead", "dealSort", [
+  { id: "score", label: "#", desc: true, sort: r => r.deal.score },
+  { id: "star", label: "★", cls: "star", title: "Favoriler", sort: r => r.watched ? 0 : 1 },
+  { id: "name", label: "Item", cls: "l", sort: byName },
+  { id: "price", label: "Birim fiyat", sort: r => r.price },
+  { id: "typical", label: "7 gün ort.", title: AVG_TITLE, sort: r => r.typical },
+  { id: "discount", label: "İndirim", desc: true, sort: r => r.deal.discount },
+  { id: "profit", label: "Al-sat kârı", desc: true, sort: r => r.deal.profit_pct,
+    title: "Şimdi alıp 7 gün ortalamasından satarsan, market kesintisinden sonra adet başına kalan" },
+  { id: "range", label: "30 gün aralığı", title: "Fiyatın 30 günlük aralıktaki yeri; en dipteki önce", sort: r => r.deal.position },
+  { id: "week", label: "7 gün", sort: r => r.week.change },
+  { id: "count", label: "İlan", desc: true, sort: r => r.count },
+], "score");
+const SIGNAL_RANK = { sell: 0, check: 1, normal: 2, hold: 3 };
+const invTable = sortableTable("invHead", "invSort", [
+  { id: "star", label: "★", cls: "star", title: "Favoriler", sort: r => r.watched ? 0 : 1 },
+  { id: "name", label: "Item", cls: "l", sort: byName },
+  { id: "owned", label: "Adet", desc: true, sort: r => r.owned },
+  { id: "price", label: "Birim fiyat", desc: true, sort: r => r.price },
+  { id: "typical", label: "7 gün ort.", title: AVG_TITLE, desc: true, sort: r => r.typical },
+  { id: "premium", label: "7 gün ort. göre", desc: true, sort: r => r.premium },
+  { id: "prev", label: "Son listeleme", desc: true, sort: r => r.prev.change },
+  { id: "week", label: "7 gün", desc: true, sort: r => r.week.change },
+  { id: "value", label: "Toplam (net)", title: "Adet × fiyat, market kesintisi düşülmüş", desc: true, sort: r => r.value_net },
+  { id: "signal", label: "Öneri", cls: "l", sort: r => SIGNAL_RANK[r.signal] },
+], "week");
+const favTable = sortableTable("favHead", "favSort", [
+  { id: "star", label: "★", cls: "star", title: "Favoriler", nosort: true },
+  { id: "name", label: "Item", cls: "l", sort: byName },
+  { id: "price", label: "Birim fiyat", sort: r => r.price },
+  { id: "tgt", label: "Hedef", sort: r => r.target },
+  { id: "target", label: "Hedefe kalan", title: "Şu anki fiyatın hedefe uzaklığı", sort: toTarget },
+  { id: "typical", label: "7 gün ort.", title: AVG_TITLE, sort: r => r.typical },
+  { id: "prev", label: "Son listeleme", sort: r => r.prev.change },
+  { id: "week", label: "7 gün", sort: r => r.week.change },
+  { id: "month", label: "30 gün", sort: r => r.month.change },
+  { id: "count", label: "İlan", desc: true, sort: r => r.count },
+  { id: "owned", label: "Sende", desc: true, sort: r => favOwned[r.item_key] },
+  { id: "status", label: "Durum", cls: "l", sort: r => favStatus(r)[0] },
+], "target");
+document.getElementById("q").value = state.q;
+document.getElementById("dir").value = state.dir;
+document.getElementById("minc").value = state.minc;
+document.getElementById("hideEmpty").checked = state.hideEmpty;
+document.querySelectorAll("#period button").forEach(b => b.classList.toggle("on", b.dataset.p === state.period));
+document.getElementById("refresh").onclick = refresh;
+document.getElementById("server").onchange = e => { state.server = +e.target.value; save(); closeDrawer(); refresh(); };
+// Inline editor (embedded browsers may not support prompt()).
+const srvEditing = on => {
+  document.getElementById("srvedit").hidden = !on;
+  document.getElementById("server").hidden = on;
+  document.getElementById("srvname").hidden = on;
+};
+document.getElementById("srvname").onclick = () => {
+  const s = servers.servers.find(x => x.server_id === state.server); if (!s) return;
+  const input = document.getElementById("srvinput");
+  input.value = s.name || "";
+  srvEditing(true);
+  input.focus();
+};
+document.getElementById("srvcancel").onclick = () => srvEditing(false);
+document.getElementById("srvsave").onclick = () => {
+  const name = document.getElementById("srvinput").value.trim();
+  srvEditing(false);
+  if (name && state.server) post("/api/server-name", { server_id: state.server, name }, t("Sunucu adı kaydedildi"));
+};
+document.getElementById("srvinput").onkeydown = e => {
+  if (e.key === "Enter") document.getElementById("srvsave").click();
+  if (e.key === "Escape") { e.stopPropagation(); srvEditing(false); }
+};
+scrim.onclick = closeDrawer;
+document.getElementById("hideBtn").onclick = openHide;
+const filterPanel = document.getElementById("filterPanel"), filterBtn = document.getElementById("filterBtn");
+const showFilters = on => { filterPanel.hidden = !on; filterBtn.setAttribute("aria-expanded", on); };
+filterBtn.onclick = e => { e.stopPropagation(); showFilters(filterPanel.hidden); };
+document.addEventListener("click", e => { if (!filterPanel.hidden && !e.target.closest(".filterbox")) showFilters(false); });
+const syncPanel = document.getElementById("syncPanel"), syncBtn = document.getElementById("sync");
+const showSync = on => { syncPanel.hidden = !on; syncBtn.setAttribute("aria-expanded", on); };
+syncBtn.onclick = e => { e.stopPropagation(); showSync(syncPanel.hidden); };
+document.addEventListener("click", e => { if (!syncPanel.hidden && !e.target.closest(".syncbox")) showSync(false); });
+document.getElementById("syncOn").onchange = async e => {
+  await post("/api/sync", { enabled: e.target.checked }, t(e.target.checked ? "Ortak veri açıldı" : "Ortak veri kapatıldı"));
+};
+document.getElementById("hideModal").onclick = e => { if (e.target.id === "hideModal") closeHide(); };
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if (!filterPanel.hidden) return showFilters(false);
+  if (!syncPanel.hidden) return showSync(false);
+  if (document.getElementById("hideModal").classList.contains("on")) closeHide();
+  else if (selected) closeDrawer();
+});
+
+function applyLang() {
+  setLocale(state.lang);
+  translateStatic();
+  setTitle();
+  document.querySelectorAll("#lang button").forEach(b => b.classList.toggle("on", b.dataset.l === state.lang));
+}
+document.querySelectorAll("#lang button").forEach(b => b.onclick = () => {
+  if (state.lang === b.dataset.l) return;
+  state.lang = b.dataset.l; save(); applyLang();
+  render();
+  if (document.getElementById("hideModal").classList.contains("on")) renderHide();
+  refresh();                                     // server-made texts (reasons, advice, weekdays) come in the new language
+});
+
+applyLang();
+setView(["deals", "craft", "inv", "fav"].includes(state.view) ? state.view : "changes");       // also does the first refresh
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

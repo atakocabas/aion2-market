@@ -1,0 +1,36 @@
+# Builds Aion2Market.exe and its installer and attaches both to a GitHub release when a v* tag is pushed:
+#   git tag v0.1.0 && git push origin v0.1.0
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e ".[app,dev]"
+      - run: pytest -q
+      - run: pyinstaller aion2market.spec
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          & $iscc "/DAppVersion=$version" installer\aion2market.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Aion2Market-Setup-*.exe
+            dist/Aion2Market.exe
+          generate_release_notes: true

@@ -1,0 +1,30 @@
+[project]
+name = "aion2market"
+version = "0.0.1"
+description = "Aion 2 market price tracker (passive Npcap capture)"
+requires-python = ">=3.11"
+dependencies = [
+    "scapy>=2.6",
+    "psutil>=5.9",
+    "lz4>=4",
+    "cryptography>=42",
+    "mcp>=2.3,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+app = ["pywebview>=5", "pyinstaller>=6"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+aion2market = ["web/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

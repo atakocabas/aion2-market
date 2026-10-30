@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "C:\\Users\\incep\\projects\\aion2-market\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "aion2market.dashboard", "--no-browser", "--port", "8770"],
+      "port": 8770,
+      "url": "http://127.0.0.1:8770"
+    },
+    {
+      "name": "share-store",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:\\Users\\incep\\projects\\aion2-market\\cloud\\node_modules\\wrangler\\bin\\wrangler.js", "dev", "--local",
+                      "--port", "8787", "-c", "C:\\Users\\incep\\projects\\aion2-market\\cloud\\wrangler.toml",
+                      "--persist-to", "C:\\Users\\incep\\projects\\aion2-market\\cloud\\.wrangler\\state"],
+      "port": 8787,
+      "url": "http://127.0.0.1:8787"
+    }
+  ]
+}

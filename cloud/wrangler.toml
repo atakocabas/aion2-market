@@ -1,0 +1,13 @@
+name = "aion2-market"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+# "false": only keys made with `sync admin create-key` work; the app can't register itself.
+OPEN_REGISTRATION = "true"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aion2-market"
+# Filled in after: npx wrangler d1 create aion2-market
+database_id = "61f77625-8352-4184-b953-ac5414b524e3"

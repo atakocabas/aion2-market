@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aion2-market": {
+      "command": "C:\\Users\\incep\\projects\\aion2-market\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "aion2market.mcp_server"]
+    }
+  }
+}
