@@ -20,6 +20,8 @@ from pathlib import Path
 
 APP_NAME = "Aion 2 Market"
 NPCAP_URL = "https://npcap.com/#download"
+ICON = Path(__file__).with_name("web") / "icon.ico"
+TITLE_BG, TITLE_TEXT, TITLE_BORDER = "#151a2c", "#e8ebf5", "#323a5c"     # --bg, --text, --line in web/index.html
 
 
 def data_dir() -> Path:
@@ -101,6 +103,70 @@ def run_service(db: Path, stop_file: Path, keylog: Path | None) -> None:
     service.run_background(db, stop_file)
 
 
+def _colorref(hex_color: str) -> int:
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    return r | g << 8 | b << 16
+
+
+def dress_window(window) -> None:
+    """Dark title bar in the page's colours, and a tray icon the window hides into when minimised.
+
+    Runs as pywebview's before_show handler, i.e. on the WinForms UI thread with window.native
+    (the Form) already built, so the WinForms calls below need no Invoke."""
+    import ctypes
+    from System import EventHandler
+    from System.Windows import Forms as WinForms             # pythonnet, already loaded by pywebview
+
+    form = window.native
+    hwnd = form.Handle.ToInt32()
+
+    def dwm(attr: int, value: int) -> None:
+        v = ctypes.c_int(value)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(v), ctypes.sizeof(v))
+    dwm(20, 1)                                               # DWMWA_USE_IMMERSIVE_DARK_MODE
+    dwm(35, _colorref(TITLE_BG))                             # DWMWA_CAPTION_COLOR (Windows 11)
+    dwm(36, _colorref(TITLE_TEXT))                           # DWMWA_TEXT_COLOR
+    dwm(34, _colorref(TITLE_BORDER))                         # DWMWA_BORDER_COLOR
+
+    tray = WinForms.NotifyIcon()
+    tray.Icon = form.Icon
+    tray.Text = APP_NAME
+    menu = WinForms.ContextMenuStrip()
+    tray.ContextMenuStrip = menu
+    state = {"last": WinForms.FormWindowState.Normal, "told": False}
+
+    def show(*_):
+        form.Show()
+        form.WindowState = state["last"]
+        form.Activate()
+
+    def on_resize(*_):
+        if form.WindowState == WinForms.FormWindowState.Minimized:
+            form.Hide()
+            if not state["told"]:
+                state["told"] = True
+                tray.ShowBalloonTip(3000, APP_NAME, "Simge durumunda: fiyatlar arka planda kaydedilmeye devam ediyor.",
+                                    WinForms.ToolTipIcon.Info)
+        else:
+            state["last"] = form.WindowState
+
+    def on_click(_, e):
+        if e.Button == WinForms.MouseButtons.Left:
+            show()
+
+    def on_closed(*_):
+        tray.Visible = False                                 # otherwise a dead icon stays until hovered
+        tray.Dispose()
+
+    menu.Items.Add("Göster", None, EventHandler(show))
+    menu.Items.Add("Çıkış", None, EventHandler(lambda *_: form.Close()))
+    tray.MouseClick += on_click
+    tray.BalloonTipClicked += show
+    form.Resize += on_resize
+    form.FormClosed += on_closed
+    tray.Visible = True
+
+
 def _log_to_file(path: Path) -> None:
     # A windowed exe has no console: sys.stdout is None and print() output would be lost.
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -149,8 +215,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             try:
                 import webview
-                webview.create_window(APP_NAME, url, width=1400, height=900, min_size=(900, 600))
-                webview.start()
+                window = webview.create_window(APP_NAME, url, width=1400, height=900, min_size=(900, 600),
+                                               background_color=TITLE_BG)
+                if sys.platform == "win32":
+                    window.events.before_show += dress_window
+                webview.start(icon=str(ICON))
             except Exception:                 # no WebView2 runtime (older Windows 10): use the browser instead
                 import traceback
                 traceback.print_exc()

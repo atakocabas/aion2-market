@@ -20,5 +20,6 @@ exe = EXE(
     a.datas,
     name="Aion2Market",
     console=False,
+    icon="src/aion2market/web/icon.ico",
     upx=False,
 )
