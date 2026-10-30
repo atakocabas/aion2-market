@@ -136,45 +136,56 @@ def default_keylog() -> Path:
     return Path(env) if env else DEFAULT_KEYLOG
 
 
+def _once(what: str, db: Path, body) -> None:
+    """One round of a background loop; an unexpected error is logged instead of ending the loop for good."""
+    try:
+        store = Store(db)
+    except Exception as e:
+        print(f"{what}: veritabanı açılamadı: {e}", flush=True)
+        return
+    try:
+        body(store)
+    except Exception:
+        import traceback
+        print(f"{what}: beklenmeyen hata (sonra tekrar denenecek)", flush=True)
+        traceback.print_exc()
+    finally:
+        store.close()
+
+
 def _item_info_loop(db: Path, stop: threading.Event, every: float = 300.0) -> None:
     """Look up official names for newly seen items in the background."""
+    def body(store):
+        found, _, errors = iteminfo.fill_missing(store, stop=stop.is_set)
+        if found:
+            print(f"{found} yeni item adı resmi veriden eklendi", flush=True)
+        if errors:
+            print(f"Item adı sorgusunda {errors} hata (sonra tekrar denenecek)", flush=True)
     while not stop.is_set():
-        store = Store(db)
-        try:
-            found, _, errors = iteminfo.fill_missing(store, stop=stop.is_set)
-            if found:
-                print(f"{found} yeni item adı resmi veriden eklendi", flush=True)
-            if errors:
-                print(f"Item adı sorgusunda {errors} hata (sonra tekrar denenecek)", flush=True)
-        finally:
-            store.close()
+        _once("Item adları", db, body)
         stop.wait(every)
 
 
 def _sync_loop(db: Path, stop: threading.Event, notifier, every: float = 60.0) -> None:
     """Share observations with the other users while sharing is on (it can be switched in the window)."""
+    def body(store):
+        client = sync.ensure_client(store)
+        if client is not None:
+            for line in sync.sync_once(store, client, notifier):
+                print(line, flush=True)
     while not stop.is_set():
-        store = Store(db)
-        try:
-            client = sync.ensure_client(store)
-            if client is not None:
-                for line in sync.sync_once(store, client, notifier):
-                    print(line, flush=True)
-        finally:
-            store.close()
+        _once("Ortak veri", db, body)
         stop.wait(every)
 
 
 def _exchange_loop(db: Path, stop: threading.Event, notifier) -> None:
     """Pull prices for the configured server from aion2.exchange every few minutes."""
+    def body(store):
+        if store.get_meta("exchange.server"):
+            for line in exchange.import_once(store, notifier=notifier):
+                print(line, flush=True)
     while not stop.is_set():
-        store = Store(db)
-        try:
-            if store.get_meta("exchange.server"):
-                for line in exchange.import_once(store, notifier=notifier):
-                    print(line, flush=True)
-        finally:
-            store.close()
+        _once("aion2.exchange", db, body)
         stop.wait(exchange.INTERVAL)
 
 
@@ -211,7 +222,10 @@ def run_live(args, store: Store) -> int:
             packets.put(p)
 
     iface = args.iface or str(conf.iface)
-    sniffer = AsyncSniffer(iface=iface, filter="tcp port 443", prn=on_packet, store=False)
+    # The system default may not be where the market traffic goes (VPN, ExitLag, several network cards).
+    market_ifaces = [iface] if args.iface else market_interfaces(iface, args.host)
+    sniffer = AsyncSniffer(iface=market_ifaces if len(market_ifaces) > 1 else iface, filter="tcp port 443",
+                           prn=on_packet, store=False)
     sniffer.start()
     # The game's own connection (inventory). With ExitLag it runs over loopback, so listen there too.
     game, game_sniffer = None, None
@@ -230,10 +244,11 @@ def run_live(args, store: Store) -> int:
         game_sniffer.start()
         print("Envanter: oyunun bağlantısı dinleniyor (oyuna her girişte güncellenir)")
     next_game_poll = 0.0
-    print(f"Dinleniyor: {iface}  anahtarlar: {args.keylog}  veritabanı: {args.db}  — durdurmak için Ctrl+C")
+    print(f"Dinleniyor: {', '.join(market_ifaces)}  anahtarlar: {args.keylog}  veritabanı: {args.db}  — durdurmak için Ctrl+C")
     print(f"Bildirim kanalları: {', '.join(notifier.channels) or 'yok'}")
     if not args.keylog.exists():
         print("Uyarı: anahtar dosyası henüz yok. Steam ve oyun SSLKEYLOGFILE ayarlandıktan sonra açılmış olmalı.")
+    keylog_seen = None
     stop_file = Path(args.stop_file) if args.stop_file else None
     stop_names = threading.Event()
     if not args.no_item_info:
@@ -244,7 +259,8 @@ def run_live(args, store: Store) -> int:
     if store.get_meta("exchange.server"):
         print(f"aion2.exchange açık: sunucu {store.get_meta('exchange.server')}, "
               f"{exchange.INTERVAL // 60} dakikada bir")
-        threading.Thread(target=_exchange_loop, args=(args.db, stop_names, notifier), daemon=True).start()
+    # Always running: the server can be chosen in the window later.
+    threading.Thread(target=_exchange_loop, args=(args.db, stop_names, notifier), daemon=True).start()
     next_poll = time.time() + 1.0
     try:
         while True:
@@ -268,6 +284,13 @@ def run_live(args, store: Store) -> int:
                 for line in tracker.poll():
                     print(line, flush=True)
                 next_poll = time.time() + 1.0
+                for s in (sniffer, game_sniffer):
+                    if s is not None and getattr(s, "exception", None) is not None:
+                        raise RuntimeError(f"paket dinleme durdu: {s.exception}") from s.exception
+                seen = args.keylog.exists()
+                if seen != keylog_seen:
+                    keylog_seen = seen
+                    set_capture_status(store, None if seen else KEYLOG_MISSING)
                 if stop_file is not None and stop_file.exists():
                     stop_file.unlink()
                     break
@@ -280,6 +303,32 @@ def run_live(args, store: Store) -> int:
             game_sniffer.stop()
         notifier.close()
     return 0
+
+
+KEYLOG_MISSING = "anahtar dosyası yok: Steam'i tamamen kapatıp yeniden aç"
+
+
+def set_capture_status(store: Store, error: str | None) -> None:
+    """What the window shows next to Npcap; None means live capture is working."""
+    if error:
+        store.set_meta("capture.error", error[:200])
+    else:
+        store.db.execute("DELETE FROM meta WHERE key = 'capture.error'")
+        store.db.commit()
+
+
+def market_interfaces(default: str, host: str = MARKET_HOST) -> list[str]:
+    """The default interface plus the one the route to the market server uses, if that differs."""
+    import socket
+    from .capture import _route_iface
+    ifaces = [default]
+    try:
+        route = _route_iface(socket.gethostbyname(host))
+    except OSError:
+        route = None
+    if route is not None and str(route) not in ifaces:
+        ifaces.append(str(route))
+    return ifaces
 
 
 def make_notifier(args) -> alerts.Notifier:

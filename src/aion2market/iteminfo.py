@@ -9,6 +9,7 @@ game or the game account.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import time
 import urllib.parse
@@ -18,7 +19,7 @@ from .store import Store
 
 API = "https://tw.ncsoft.com/aion2/api/gameconst/item"
 DELAY = 0.5                      # seconds between requests
-RETRY_UNKNOWN_AFTER = 7 * 86400  # look again at keys the API didn't know, in case they are added later
+RETRY_UNKNOWN_AFTER = 6 * 3600   # look again at keys the API didn't know (added later, or a bad answer)
 
 
 def fetch(item_key: str, lang: str = "en") -> dict | None:
@@ -38,13 +39,15 @@ def fill_missing(store: Store, delay: float = DELAY, limit: int | None = None, p
     """Look up items without official data. Returns (found, unknown, errors)."""
     keys = store.keys_missing_info(time.time() - RETRY_UNKNOWN_AFTER)[:limit]
     found = unknown = errors = 0
+    last_error = None
     for i, key in enumerate(keys):
         if stop():
             break
         try:
             info = fetcher(key)
-        except (OSError, ValueError) as e:
+        except (OSError, ValueError, http.client.HTTPException) as e:
             errors += 1
+            last_error = f"{type(e).__name__}: {e}"
             if progress:
                 progress(i + 1, len(keys), key, f"hata: {e}")
             if errors >= 5 and found + unknown == 0:
@@ -60,6 +63,12 @@ def fill_missing(store: Store, delay: float = DELAY, limit: int | None = None, p
             unknown += 1
         if progress:
             progress(i + 1, len(keys), key, info["name"] if info else "(resmi veride yok)")
+    if found or unknown:          # the source answered: a few failed keys are not worth showing
+        store.set_meta("iteminfo.last_ok", str(time.time()))
+        store.db.execute("DELETE FROM meta WHERE key = 'iteminfo.last_error'")
+        store.db.commit()
+    elif last_error:
+        store.set_meta("iteminfo.last_error", last_error[:200])
     return found, unknown, errors
 
 

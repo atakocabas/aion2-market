@@ -75,3 +75,18 @@ CREATE TABLE IF NOT EXISTS servers (
     server_id INTEGER PRIMARY KEY,
     name      TEXT NOT NULL
 );
+
+-- Official item data (names, grades, icons) one user's app fetched from NC's public item API, so users
+-- whose network can't reach it still get names. The first upload per item is kept. seq is the download cursor.
+CREATE TABLE IF NOT EXISTS item_info (
+    seq            INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_key       TEXT NOT NULL UNIQUE,
+    name           TEXT NOT NULL,
+    grade          TEXT,
+    grade_name     TEXT,
+    category       TEXT,
+    type           TEXT,
+    icon           TEXT,
+    contributor_id INTEGER NOT NULL,
+    received_ts    REAL NOT NULL
+);

@@ -44,6 +44,7 @@ header .topbar .seg button { padding: 4px 11px; }
   vertical-align: 1px; background: currentColor; }
 .npcap.ok { color: var(--down); cursor: default; }
 .npcap.off { color: var(--muted); }
+.npcap.err { color: var(--up); cursor: help; }
 .npcap.off:hover { color: var(--aether); }
 header .tabs { margin-top: 0; }
 .brand { display: flex; align-items: center; gap: 10px; font: 400 17px/1 var(--display); color: var(--text); letter-spacing: .02em; }
@@ -635,6 +636,10 @@ const EN = {
   "Açıkken oyunda gördüğün market fiyatları ortak depoya gönderilir, diğer oyuncuların gördükleri de sana gelir. Böylece market, sen açmasan da güncel kalır. Karakter, hesap ya da oturum bilgisi gönderilmez.":
     "While on, the market prices you see in game go to a shared store, and what other players see comes to you, so the market stays current even when you don't open it. No character, account or session data is sent.",
 "Npcap kurulumu aktif": "Npcap installation active",
+  "Canlı kayıt çalışmıyor": "Live recording not working",
+  "Canlı kayıt çalışmıyor: {0}": "Live recording not working: {0}",
+  "Item adları NCSOFT'tan alınamıyor ({0}); ortak veriden gelmesi bekleniyor.":
+    "Item names can't be fetched from NCSOFT ({0}); waiting for them from shared data.",
   "Npcap kurulu değil · indir": "Npcap not installed · download",
   "Oyunda açtığın pazar aramaları anında kaydediliyor.": "Market searches you open in game are recorded instantly.",
   "Npcap kurarsan oyunda açtığın pazar aramaları anında kaydedilir; en güncel fiyatlar böyle gelir.":
@@ -1329,10 +1334,14 @@ async function loadServers() {
   el.title = t("Ortak veri ayarı");
   document.getElementById("syncOn").checked = !!sy.enabled;
   const np = servers.npcap || {}, nel = document.getElementById("npcap");
-  nel.className = "npcap " + (np.installed ? "ok" : "off");
-  nel.textContent = np.installed ? t("Npcap kurulumu aktif") : t("Npcap kurulu değil · indir");
-  nel.title = np.installed ? t("Oyunda açtığın pazar aramaları anında kaydediliyor.")
-    : t("Npcap kurarsan oyunda açtığın pazar aramaları anında kaydedilir; en güncel fiyatlar böyle gelir.");
+  const broken = np.installed && np.error;
+  nel.className = "npcap " + (broken ? "err" : np.installed ? "ok" : "off");
+  nel.textContent = broken ? t("Canlı kayıt çalışmıyor")
+    : np.installed ? t("Npcap kurulumu aktif") : t("Npcap kurulu değil · indir");
+  nel.title = (broken ? t("Canlı kayıt çalışmıyor: {0}", np.error)
+    : np.installed ? t("Oyunda açtığın pazar aramaları anında kaydediliyor.")
+    : t("Npcap kurarsan oyunda açtığın pazar aramaları anında kaydedilir; en güncel fiyatlar böyle gelir."))
+    + (np.names_error ? "\n" + t("Item adları NCSOFT'tan alınamıyor ({0}); ortak veriden gelmesi bekleniyor.", np.names_error) : "");
   if (np.installed) nel.removeAttribute("href"); else nel.href = np.url;
 }
 

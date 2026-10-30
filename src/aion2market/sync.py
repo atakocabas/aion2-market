@@ -2,8 +2,10 @@
 
 Uploads only what this computer's own game client saw (origin 'local') and
 downloads everyone's rows as origin 'shared'. What is sent: server id, item key,
-time, prices, listing counts and listing ids/prices. Nothing about the
-character, account or session.
+time, prices, listing counts and listing ids/prices, plus the official item
+names/grades/icons looked up from NC's public API (iteminfo.py), so users whose
+network can't reach that API still get names. Nothing about the character,
+account or session.
 
 The store's address is built in (DEFAULT_URL); on first use the app asks the
 store for its own key. Sharing is on by default and can be switched off in the
@@ -20,6 +22,7 @@ window or with `disable`.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import time
@@ -36,6 +39,7 @@ DEFAULT_URL = "https://aion2-market.aion2-market-cloud.workers.dev"
 
 UPLOAD_SNAPSHOTS = 5000
 UPLOAD_LISTINGS = 2000
+UPLOAD_ITEMS = 2000
 ALERT_WINDOW = 30 * 60     # only fresh shared prices may trigger alerts
 REGISTER_RETRY = 10 * 60   # after a failed self-registration, wait this long before asking again
 
@@ -64,7 +68,7 @@ class ShareClient:
             except ValueError:
                 msg = ""
             raise ShareError(f"HTTP {e.code} {msg}".strip()) from None
-        except (urllib.error.URLError, OSError, ValueError) as e:
+        except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException) as e:
             raise ShareError(str(getattr(e, "reason", e))) from None
 
 
@@ -182,6 +186,49 @@ def download_new(store: Store, client: ShareClient) -> tuple[list[tuple[int, str
     return new_snaps, new_lists
 
 
+_ITEM_COLS = "item_key, name, grade, grade_name, category, type, icon"
+
+
+def upload_items(store: Store, client: ShareClient) -> int:
+    """Send official item data this computer looked up, so computers that can't reach NC get names too."""
+    sent = 0
+    while True:
+        cursor = int(store.get_meta("sync.up.items", "0"))
+        rows = store.db.execute(
+            f"SELECT rowid, {_ITEM_COLS} FROM item_info WHERE found = 1 AND name IS NOT NULL AND rowid > ? "
+            "ORDER BY rowid LIMIT ?", (cursor, UPLOAD_ITEMS)).fetchall()
+        if not rows:
+            return sent
+        client.request("POST", "/v1/upload", {"items": [list(r[1:]) for r in rows]})
+        store.set_meta("sync.up.items", str(rows[-1][0]))
+        sent += len(rows)
+
+
+def download_items(store: Store, client: ShareClient, now: float) -> int:
+    """Official item data other users looked up; fills items this computer has no data for."""
+    new = 0
+    while True:
+        cursor = int(store.get_meta("sync.down.items", "0"))
+        page = client.request("GET", f"/v1/items?since={cursor}")
+        caught_up = not store.db.execute(
+            "SELECT 1 FROM item_info WHERE found = 1 AND name IS NOT NULL AND rowid > ?",
+            (int(store.get_meta("sync.up.items", "0")),)).fetchone()
+        for _, *r in page["rows"]:
+            cur = store.db.execute(
+                f"INSERT INTO item_info (found, fetched_ts, {_ITEM_COLS}) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(item_key) DO UPDATE SET found = 1, fetched_ts = excluded.fetched_ts, name = excluded.name, "
+                "grade = excluded.grade, grade_name = excluded.grade_name, category = excluded.category, "
+                "type = excluded.type, icon = excluded.icon WHERE item_info.found = 0", (now, *r))
+            new += max(cur.rowcount, 0)
+        store.db.commit()
+        if caught_up:                                # what just came down is not sent back up
+            top = store.db.execute("SELECT COALESCE(MAX(rowid), 0) FROM item_info").fetchone()[0]
+            store.set_meta("sync.up.items", str(top))
+        store.set_meta("sync.down.items", str(page["next"]))
+        if not page["more"]:
+            return new
+
+
 def shared_alerts(store: Store, new_snaps, notifier, now: float) -> list[str]:
     """Alerts for watched items from prices other users just saw on this computer's market server."""
     home = store.home_server()
@@ -209,6 +256,12 @@ def sync_once(store: Store, client: ShareClient, notifier=None, now: float | Non
     store.db.execute("DELETE FROM meta WHERE key = 'sync.last_error'")
     store.db.commit()
     lines = []
+    try:                       # kept apart so a store without /v1/items still shares prices
+        up_i, new_items = upload_items(store, client), download_items(store, client, now)
+        if up_i or new_items:
+            lines.append(f"Item adları: {up_i} gönderildi, {new_items} alındı")
+    except ShareError as e:
+        lines.append(f"Item adları eşitlenemedi: {e}")
     if up_s or up_l or new_snaps or new_lists:
         items = len({(s, k) for s, k, _, _ in new_snaps})
         lines.append(f"Ortak veri: {up_s + up_l} kayıt gönderildi, {len(new_snaps)} fiyat ({items} item) "

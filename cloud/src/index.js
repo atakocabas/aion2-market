@@ -2,9 +2,10 @@
 // saw, everyone downloads what the others saw.
 //
 //   POST /v1/register               (no key)           {} -> {key}; the app asks for its own key once
-//   POST /v1/upload                 (contributor key)  {snapshots: [...], listings: [...]}
+//   POST /v1/upload                 (contributor key)  {snapshots: [...], listings: [...], items: [...]}
 //   GET  /v1/snapshots?since=<seq>  (contributor key)  rows newer than the cursor
 //   GET  /v1/listings?since=<seq>   (contributor key)
+//   GET  /v1/items?since=<seq>      (contributor key)  official item names/grades/icons
 //   GET  /v1/servers                (contributor key)  server names
 //   /v1/admin/...                   (ADMIN_TOKEN)      keys, server names, purge
 //
@@ -13,6 +14,7 @@
 const MAX_BODY = 2_000_000;
 const MAX_SNAPSHOTS = 5000;
 const MAX_LISTINGS = 2000;
+const MAX_ITEMS = 2000;
 const MAX_DOWNLOAD = 5000;
 const CHUNK = 500;                      // rows per INSERT ... SELECT FROM json_each(?)
 const HISTORY_SECONDS = 90 * 86400;     // oldest observation accepted
@@ -120,6 +122,17 @@ function cleanListings(rows, now) {
   return [ok, rows.length - ok.length];
 }
 
+// [item_key, name, grade, grade_name, category, type, icon] as NC's item API gives them
+function cleanItems(rows) {
+  if (!Array.isArray(rows)) return [[], 0];
+  if (rows.length > MAX_ITEMS) throw new HttpError(413, `at most ${MAX_ITEMS} items per request`);
+  const ok = rows.filter(r => Array.isArray(r) && r.length === 7 && isKey(r[0]) &&
+    typeof r[1] === "string" && r[1].trim() && r[1].length <= 120 &&
+    isText(r[2], 40) && isText(r[3], 40) && isText(r[4], 60) && isText(r[5], 40) &&
+    (r[6] == null || (typeof r[6] === "string" && r[6].length <= 300 && r[6].startsWith("https://"))));
+  return [ok, rows.length - ok.length];
+}
+
 async function insertChunks(env, sql, rows, extra) {
   let inserted = 0;
   for (let i = 0; i < rows.length; i += CHUNK) {
@@ -212,7 +225,8 @@ async function upload(request, env) {
   const now = Date.now() / 1000;
   const [cleanSnaps, badSnaps] = cleanSnapshots(data.snapshots, now);
   const [lists, badLists] = cleanListings(data.listings, now);
-  await takeQuota(env, who, cleanSnaps.length + lists.length, now);
+  const [items, badItems] = cleanItems(data.items);
+  await takeQuota(env, who, cleanSnaps.length + lists.length + items.length, now);
   const [snaps, outliers] = await screenSnapshots(env, cleanSnaps, now);
   const snapInserted = await insertChunks(env,
     `INSERT OR IGNORE INTO snapshots (server_id, item_key, ts, min_unit_price, sale_count, contributor_id, received_ts)
@@ -227,8 +241,15 @@ async function upload(request, env) {
             json_extract(value, '$[6]'), json_extract(value, '$[7]'), json_extract(value, '$[8]'),
             json_extract(value, '$[9]'), json_extract(value, '$[10]'), ?2, ?3
      FROM json_each(?1)`, lists, [who.id, now]);
+  const itemInserted = await insertChunks(env,
+    `INSERT OR IGNORE INTO item_info (item_key, name, grade, grade_name, category, type, icon, contributor_id, received_ts)
+     SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]'),
+            json_extract(value, '$[3]'), json_extract(value, '$[4]'), json_extract(value, '$[5]'),
+            json_extract(value, '$[6]'), ?2, ?3
+     FROM json_each(?1)`, items, [who.id, now]);
   return json({ snapshots: { inserted: snapInserted, rejected: badSnaps, outliers },
-                listings: { inserted: listInserted, rejected: badLists } });
+                listings: { inserted: listInserted, rejected: badLists },
+                items: { inserted: itemInserted, rejected: badItems } });
 }
 
 async function download(request, env, table) {
@@ -236,9 +257,11 @@ async function download(request, env, table) {
   const url = new URL(request.url);
   const since = Math.max(0, parseInt(url.searchParams.get("since") || "0", 10) || 0);
   const limit = Math.min(MAX_DOWNLOAD, Math.max(1, parseInt(url.searchParams.get("limit") || `${MAX_DOWNLOAD}`, 10) || MAX_DOWNLOAD));
-  const cols = table === "snapshots"
-    ? "seq, server_id, item_key, ts, min_unit_price, sale_count"
-    : "seq, server_id, item_key, ts, sale_id, quantity, sale_price, unit_price, effective_from, effective_to, grade_id, category_id";
+  const cols = {
+    snapshots: "seq, server_id, item_key, ts, min_unit_price, sale_count",
+    listings: "seq, server_id, item_key, ts, sale_id, quantity, sale_price, unit_price, effective_from, effective_to, grade_id, category_id",
+    item_info: "seq, item_key, name, grade, grade_name, category, type, icon",
+  }[table];
   const { results } = await env.DB.prepare(`SELECT ${cols} FROM ${table} WHERE seq > ? ORDER BY seq LIMIT ?`)
     .bind(since, limit + 1).raw().then(rows => ({ results: rows }));
   const more = results.length > limit;
@@ -271,11 +294,12 @@ async function admin(request, env, path) {
   }
   if (path === "/v1/admin/purge" && request.method === "POST") {
     const id = +data.contributor_id;
-    const [a, b] = await env.DB.batch([
+    const [a, b, c] = await env.DB.batch([
       env.DB.prepare("DELETE FROM snapshots WHERE contributor_id = ?").bind(id),
       env.DB.prepare("DELETE FROM listings WHERE contributor_id = ?").bind(id),
+      env.DB.prepare("DELETE FROM item_info WHERE contributor_id = ?").bind(id),
     ]);
-    return json({ snapshots: a.meta.changes, listings: b.meta.changes });
+    return json({ snapshots: a.meta.changes, listings: b.meta.changes, items: c.meta.changes });
   }
   if (path === "/v1/admin/servers" && request.method === "POST") {
     if (!isServer(data.server_id) || !String(data.name || "").trim()) throw new HttpError(400, "server_id and name required");
@@ -292,6 +316,7 @@ async function route(request, env) {
   if (path === "/v1/upload" && request.method === "POST") return upload(request, env);
   if (path === "/v1/snapshots" && request.method === "GET") return download(request, env, "snapshots");
   if (path === "/v1/listings" && request.method === "GET") return download(request, env, "listings");
+  if (path === "/v1/items" && request.method === "GET") return download(request, env, "item_info");
   if (path === "/v1/servers" && request.method === "GET") {
     await contributor(request, env);
     const { results } = await env.DB.prepare("SELECT server_id, name FROM servers").all();

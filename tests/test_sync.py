@@ -11,7 +11,7 @@ class FakeCloud:
     """In-memory stand-in for cloud/src/index.js with the same request/response shapes."""
 
     def __init__(self):
-        self.snapshots, self.listings, self.servers = [], [], {}
+        self.snapshots, self.listings, self.items, self.servers = [], [], [], {}
 
     def client(self, key):
         cloud = self
@@ -30,8 +30,12 @@ class FakeCloud:
                     self.snapshots.append([len(self.snapshots) + 1, *r])
             for r in body.get("listings", []):
                 self.listings.append([len(self.listings) + 1, *r])
+            for r in body.get("items", []):
+                self.uploaded_items = getattr(self, "uploaded_items", 0) + 1
+                if not any(x[1] == r[0] for x in self.items):                 # the first upload wins
+                    self.items.append([len(self.items) + 1, *r])
             return {}
-        if p in ("/v1/snapshots", "/v1/listings"):
+        if p in ("/v1/snapshots", "/v1/listings", "/v1/items"):
             rows = [r for r in getattr(self, p[4:]) if r[0] > since][:2]          # tiny pages
             more = len([r for r in getattr(self, p[4:]) if r[0] > since]) > 2
             return {"rows": rows, "next": rows[-1][0] if rows else since, "more": more}
@@ -136,3 +140,50 @@ def test_no_built_in_store_means_nothing_happens(monkeypatch):
     monkeypatch.delenv("AION2_SHARE_URL", raising=False)
     monkeypatch.setattr(sync, "DEFAULT_URL", "")
     assert sync.ensure_client(s, now=NOW) is None and not dashboard.sync_status(s)["configured"]
+
+
+ODYLE = {"name": "Pure Odyle", "grade": "Legend", "gradeName": "Epic", "categoryName": "Gatherable Material",
+         "type": "Misc", "icon": "https://assets.example/od.png"}
+
+
+def test_item_names_reach_users_who_cannot_look_them_up():
+    cloud = FakeCloud()
+    a, b = Store(":memory:"), Store(":memory:")
+    a.add_snapshots(NOW - 60, 12306, [("610610015", 100.0, 3), ("2", 5.0, 1)])
+    a.set_item_info("610610015", ODYLE, NOW)
+    a.set_item_info("2", None, NOW)                                    # unknown to NC: not shared
+    b.add_snapshots(NOW - 60, 12306, [("3", 7.0, 1)])
+    b.set_item_info("610610015", None, NOW)                            # B's lookup failed with id 0
+    b.set_name("3", "Benim adım")
+
+    sync.sync_once(a, cloud.client("ka"), now=NOW)
+    lines = sync.sync_once(b, cloud.client("kb"), now=NOW)
+    assert b.name("610610015") == "Pure Odyle" and b.item_info()["610610015"]["icon"] == ODYLE["icon"]
+    assert b.name("3") == "Benim adım" and "610610015" not in b.keys_missing_info(0)
+    assert any("Item adları" in l for l in lines)
+
+    sync.sync_once(b, cloud.client("kb"), now=NOW)
+    sync.sync_once(a, cloud.client("ka"), now=NOW)
+    assert cloud.uploaded_items == 1                                   # names that came down are not sent back
+
+    b.set_item_info("4", dict(ODYLE, name="Later"), NOW)               # B's own later lookups still go up
+    sync.sync_once(b, cloud.client("kb"), now=NOW)
+    sync.sync_once(a, cloud.client("ka"), now=NOW)
+    assert a.name("4") == "Later"
+
+
+def test_store_without_item_endpoint_still_shares_prices():
+    cloud = FakeCloud()
+    handle = cloud.handle
+
+    def old_store(method, path, body):
+        if path.startswith("/v1/items") or (body and "items" in body):
+            raise sync.ShareError("HTTP 404 not found")
+        return handle(method, path, body)
+    cloud.handle = old_store
+    a = Store(":memory:")
+    a.add_snapshots(NOW - 60, 12306, [("1", 100.0, 3)])
+    a.set_item_info("1", ODYLE, NOW)
+    lines = sync.sync_once(a, cloud.client("ka"), now=NOW)
+    assert len(cloud.snapshots) == 1 and a.get_meta("sync.last_error") is None
+    assert any("Item adları eşitlenemedi" in l for l in lines)

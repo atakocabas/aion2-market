@@ -28,7 +28,7 @@ def test_fill_missing_stores_found_and_unknown_and_skips_them_next_time():
     assert s.item_info()["610610015"]["grade_name"] == "Epic"
     calls.clear()
     iteminfo.fill_missing(s, delay=0, fetcher=fake)
-    assert calls == ["110230006"]          # unknown keys wait a week; failed ones retry
+    assert calls == ["110230006"]          # unknown keys wait a few hours; failed ones retry
 
 
 def test_user_name_wins_over_official_and_both_resolve():

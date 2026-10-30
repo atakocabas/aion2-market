@@ -18,6 +18,7 @@ gentle with someone else's service.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import time
 import urllib.error
@@ -48,7 +49,7 @@ def http_json(url: str) -> dict:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         raise ExchangeError(f"HTTP {e.code}") from None
-    except (urllib.error.URLError, OSError, ValueError) as e:
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException) as e:
         raise ExchangeError(str(getattr(e, "reason", e))) from None
 
 

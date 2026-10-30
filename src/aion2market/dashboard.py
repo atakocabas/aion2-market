@@ -484,10 +484,15 @@ def sync_status(store: Store) -> dict:
             "last_ok": float(last) if last else None, "last_error": store.get_meta("sync.last_error")}
 
 
-def npcap_status() -> dict:
-    """Whether live capture is possible: without Npcap the app only has the background sources."""
+def npcap_status(store: Store | None = None) -> dict:
+    """Whether live capture is possible and working: without Npcap the app only has the background sources.
+    ``error`` is why live capture isn't running (no key file yet, capture failed); ``names_error`` why
+    official item names can't be looked up on this computer."""
     from .app import NPCAP_URL, npcap_installed
-    return {"installed": npcap_installed(), "url": NPCAP_URL}
+    status = {"installed": npcap_installed(), "url": NPCAP_URL}
+    if store is not None:
+        status |= {"error": store.get_meta("capture.error"), "names_error": store.get_meta("iteminfo.last_error")}
+    return status
 
 
 def db_path() -> Path:
@@ -548,7 +553,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(crafting_view(store, server_id, lang))
             if path == "/api/servers":
                 return self._json({"servers": store.servers(), "home": store.home_server(),
-                                   "sync": sync_status(store), "npcap": npcap_status()})
+                                   "sync": sync_status(store), "npcap": npcap_status(store)})
             if path.startswith("/api/item/") and path[10:].isdigit():
                 return self._json(item_detail(store, path[10:], server_id, lang))
         self._send(HTTPStatus.NOT_FOUND, b"not found", "text/plain")
