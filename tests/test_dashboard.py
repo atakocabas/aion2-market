@@ -54,6 +54,18 @@ def test_item_missing_from_latest_listing_is_not_listed():
     assert rows["4"]["count"] == 0 and rows["4"]["last_count"] == 1 and rows["1"]["count"] == 8
 
 
+def test_small_update_after_a_scan_does_not_unlist_the_scan():
+    s = Store(":memory:")
+    s.add_snapshots(NOW - 3600, 12306, [(str(k), 10.0, 3) for k in range(10)])     # full market scan
+    s.add_snapshots(NOW - 1800, 12306, [("0", 9.0, 4), ("10", 5.0, 2)])            # an item search, shared data
+    rows = {r["item_key"]: r for r in dashboard.item_rows(s, NOW)["items"]}
+    assert all(r["listed"] for r in rows.values())
+    assert rows["5"]["count"] == 3 and rows["0"]["count"] == 4
+    s.add_snapshots(NOW - 60, 12306, [(str(k), 10.0, 3) for k in range(1, 10)])    # a newer scan without 0 and 10
+    rows = {r["item_key"]: r for r in dashboard.item_rows(s, NOW)["items"]}
+    assert not rows["0"]["listed"] and not rows["10"]["listed"] and rows["5"]["listed"]
+
+
 def _series(store, key, points):
     for ts, price in points:
         store.add_snapshots(ts, 12306, [(key, price, 3)])

@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import statistics
 import time
 import urllib.parse
 import webbrowser
-from collections import defaultdict
+from collections import Counter, defaultdict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -29,6 +30,9 @@ DAY = 86400.0
 # Opening the market and then an item gives several snapshots seconds apart;
 # anything closer than this to the current value counts as the same listing.
 SESSION_GAP = 300.0
+# A market scan covers at least this share of the items seen in the last 30 days; an item missing from
+# the newest scan isn't for sale. Item searches and small shared updates only tell about their own items.
+SCAN_SHARE = 0.5
 WINDOWS = {"week": 7 * DAY, "month": 30 * DAY}
 SPARK_POINTS = 40
 # Bogus listings (a lone 10,000,000 placeholder, a mistyped 1 kinah) would otherwise dominate the
@@ -82,6 +86,25 @@ def _base(series: list[tuple], cutoff: float, current_ts: float) -> tuple[tuple 
     return (first, True) if first[0] < current_ts - SESSION_GAP else (None, True)
 
 
+def last_scan(series: dict[str, list[tuple]], now: float) -> float | None:
+    """Time of the newest snapshot of the newest market scan (see SCAN_SHARE), or None without one."""
+    recent = [(p[0], key) for key, s in series.items() for p in s if p[0] >= now - 30 * DAY]
+    need = max(1, math.ceil(len({key for _, key in recent}) * SCAN_SHARE))
+    recent.sort(reverse=True)
+    window, newest = Counter(), 0
+    for ts, key in recent:
+        window[key] += 1
+        while recent[newest][0] - ts > SESSION_GAP:
+            old = recent[newest][1]
+            window[old] -= 1
+            if not window[old]:
+                del window[old]
+            newest += 1
+        if len(window) >= need:
+            return recent[newest][0]
+    return None
+
+
 def default_server(store: Store) -> int | None:
     """This computer's own market server, else the one with the newest data."""
     servers = store.servers()
@@ -111,6 +134,7 @@ def item_rows(store: Store, now: float | None = None, server_id: int | None = No
     watch = dict(store.watchlist())
     latest = max(s[-1][0] for s in series.values())
     first = min(s[0][0] for s in series.values())
+    scan = last_scan(series, now) or latest
 
     items = []
     for key, s in series.items():
@@ -133,10 +157,10 @@ def item_rows(store: Store, now: float | None = None, server_id: int | None = No
             "official_name": official.get("name"), "icon": official.get("icon"),
             "grade": official.get("grade"), "grade_name": official.get("grade_name"),
             "category": official.get("category"), "type": official.get("type"),
-            # Missing from the newest market listing means nobody sells it now: 0 listings,
+            # Missing from the newest market scan means nobody sells it now: 0 listings,
             # with the last seen price and count kept for reference.
-            "price": price, "count": count if ts >= latest - SESSION_GAP else 0, "last_count": count, "ts": ts,
-            "listed": ts >= latest - SESSION_GAP,
+            "price": price, "count": count if ts >= scan - SESSION_GAP else 0, "last_count": count, "ts": ts,
+            "listed": ts >= scan - SESSION_GAP,
             "watched": key in watch, "target": watch.get(key),
             "typical": typical_price([(p[0], p[1]) for p in s], now), "suspect": suspect,
             "median30": bounds[0] if bounds else None,
