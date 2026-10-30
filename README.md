@@ -43,7 +43,6 @@ Sunucudan gelen akışın çerçeve yapısı ve LZ4 açma işlemi [protocol.py](
 
 ## Bulgular (29 Ekim 2026)
 
-- Oyun trafiği ExitLag üzerinden `127.0.0.1:55091` adresinden geçiyor. Sunucudan gelen akış tamamen çözülüyor; istemciden giden akış şifreli.
 - Market araması (Pure Odyle, 82.000, 04:52–04:53) oyun akışında görünmüyor. Fiyat şu biçimlerde arandı: u32, u64, varint, float, double, zigzag, ×10, ×100 ve 256 tek baytlık XOR anahtarı. Hiçbirinde eşleşme yok.
 - **Market verisi HTTPS ile `qos-api.g.nc.com` (34.117.142.223) adresinden geliyor.** Zamanlamalı testte iki arama (04:57:58 ve 04:59:15) bu sunucuda iki ayrı patlamaya denk geldi: her seferinde 3 yeni bağlantı açıldı, ~80-105 KB veri indi ve ~32-35 KB veri gitti. Oyun akışı bu anlarda değişmedi. Sunucu adındaki "qos" yanıltıcı.
 - TLS parmak izi OpenSSL'e ait: GREASE yok, ALPN `http/1.1`, uzantı 49 (post_handshake_auth) var. Yani istekler CEF'ten değil, oyunun `libcurl.dll` + OpenSSL ile yaptığı çağrılardan geliyor. İçerik pasif dinlemeyle okunamaz; denenecek yol curl'ün `SSLKEYLOGFILE` desteği.
