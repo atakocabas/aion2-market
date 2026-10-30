@@ -11,6 +11,7 @@ Data lives in %LOCALAPPDATA%\\aion2market (market.db, app.log) unless --db or AI
 from __future__ import annotations
 
 import argparse
+import functools
 import os
 import sys
 import threading
@@ -108,13 +109,43 @@ def _colorref(hex_color: str) -> int:
     return r | g << 8 | b << 16
 
 
-def dress_window(window) -> None:
-    """Dark title bar in the page's colours, and a tray icon the window hides into when minimised.
+SINGLE_INSTANCE = "Local\\Aion2Market.instance"
+SHOW_EVENT = "Local\\Aion2Market.show"
+
+
+def claim_single_instance():
+    """The show event if this is the only running app; None after asking the running one to show itself.
+
+    Closing the window only hides it in the tray, so starting the app again must not start a second
+    service (double capture, double notifications) but bring the first window back."""
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.CreateMutexW.restype = kernel32.CreateEventW.restype = ctypes.c_void_p
+    mutex = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE)
+    already_running = ctypes.GetLastError() == 183       # ERROR_ALREADY_EXISTS; the handle lives until we exit
+    event = kernel32.CreateEventW(None, False, False, SHOW_EVENT)
+    if already_running and mutex:
+        kernel32.SetEvent(ctypes.c_void_p(event))
+        return None
+    return event
+
+
+def _wait_for_show(event, show) -> None:
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    while kernel32.WaitForSingleObject(ctypes.c_void_p(event), 0xFFFFFFFF) == 0:   # WAIT_OBJECT_0
+        show()
+
+
+def dress_window(window, show_event=None) -> None:
+    """Dark title bar in the page's colours, and a tray icon the window hides into when minimised or
+    closed; only the tray menu's Çıkış really quits, so the service keeps recording and notifying.
 
     Runs as pywebview's before_show handler, i.e. on the WinForms UI thread with window.native
     (the Form) already built, so the WinForms calls below need no Invoke."""
     import ctypes
-    from System import EventHandler
+    from System import Action, EventHandler
+    from System.Drawing import Icon
     from System.Windows import Forms as WinForms             # pythonnet, already loaded by pywebview
 
     form = window.native
@@ -129,26 +160,41 @@ def dress_window(window) -> None:
     dwm(34, _colorref(TITLE_BORDER))                         # DWMWA_BORDER_COLOR
 
     tray = WinForms.NotifyIcon()
-    tray.Icon = form.Icon
+    # A NotifyIcon without an icon is never shown, not even in the hidden tray area.
+    tray.Icon = Icon(str(ICON)) if ICON.is_file() else form.Icon
     tray.Text = APP_NAME
     menu = WinForms.ContextMenuStrip()
     tray.ContextMenuStrip = menu
-    state = {"last": WinForms.FormWindowState.Normal, "told": False}
+    state = {"last": WinForms.FormWindowState.Normal, "told": False, "quit": False}
 
     def show(*_):
         form.Show()
         form.WindowState = state["last"]
         form.Activate()
 
+    def hide_to_tray():
+        form.Hide()
+        if not state["told"]:
+            state["told"] = True
+            tray.ShowBalloonTip(3000, APP_NAME, "Arka planda çalışıyor: fiyatlar kaydedilmeye ve bildirimler gelmeye "
+                                                "devam ediyor. Kapatmak için tepsi simgesinden Çıkış.",
+                                WinForms.ToolTipIcon.Info)
+
     def on_resize(*_):
         if form.WindowState == WinForms.FormWindowState.Minimized:
-            form.Hide()
-            if not state["told"]:
-                state["told"] = True
-                tray.ShowBalloonTip(3000, APP_NAME, "Simge durumunda: fiyatlar arka planda kaydedilmeye devam ediyor.",
-                                    WinForms.ToolTipIcon.Info)
+            hide_to_tray()
         else:
             state["last"] = form.WindowState
+
+    def on_closing(_, e):
+        # The X button and Alt+F4; Windows shutting down or the tray's Çıkış still close.
+        if e.CloseReason == WinForms.CloseReason.UserClosing and not state["quit"]:
+            e.Cancel = True
+            hide_to_tray()
+
+    def quit_app(*_):
+        state["quit"] = True
+        form.Close()
 
     def on_click(_, e):
         if e.Button == WinForms.MouseButtons.Left:
@@ -159,12 +205,16 @@ def dress_window(window) -> None:
         tray.Dispose()
 
     menu.Items.Add("Göster", None, EventHandler(show))
-    menu.Items.Add("Çıkış", None, EventHandler(lambda *_: form.Close()))
+    menu.Items.Add("Çıkış", None, EventHandler(quit_app))
     tray.MouseClick += on_click
     tray.BalloonTipClicked += show
     form.Resize += on_resize
+    form.FormClosing += on_closing
     form.FormClosed += on_closed
     tray.Visible = True
+    if show_event is not None:                               # the app was started again: bring this window back
+        threading.Thread(target=_wait_for_show, args=(show_event, lambda: form.Invoke(Action(show))),
+                         daemon=True).start()
 
 
 def _log_to_file(path: Path) -> None:
@@ -185,6 +235,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--browser", action="store_true", help="kendi penceresi yerine tarayıcıda aç")
     ap.add_argument("--no-service", action="store_true", help="sadece arayüz, paket dinleme yok")
     args = ap.parse_args(argv)
+
+    show_event = None
+    if sys.platform == "win32" and not args.browser:
+        show_event = claim_single_instance()
+        if show_event is None:
+            return 0
 
     db = args.db or Path(os.environ.get("AION2_DB") or data_dir() / "market.db")
     os.environ["AION2_DB"] = str(db)         # dashboard.db_path() reads this
@@ -218,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
                 window = webview.create_window(APP_NAME, url, width=1400, height=900, min_size=(900, 600),
                                                background_color=TITLE_BG)
                 if sys.platform == "win32":
-                    window.events.before_show += dress_window
+                    window.events.before_show += functools.partial(dress_window, show_event=show_event)
                 webview.start(icon=str(ICON))
             except Exception:                 # no WebView2 runtime (older Windows 10): use the browser instead
                 import traceback

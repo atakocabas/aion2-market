@@ -27,6 +27,8 @@ UninstallDisplayIcon={app}\{#AppExe}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+; the app keeps running in the tray after its window is closed; setup and uninstall ask to quit it first
+AppMutex=Aion2Market.instance
 ; the uninstaller may remove SSLKEYLOGFILE; tell running programs
 ChangesEnvironment=yes
 ; Signs setup and uninstaller when sign.ps1 has a certificate; the caller defines the tool (absolute path):
