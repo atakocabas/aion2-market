@@ -199,7 +199,7 @@ Sınırlar: envanter oyuna girişte güncellenir, oyun içindeki anlık değişi
 
 ### Üretim sayfası (al mı, üret mi)
 
-**Üretim** sekmesi Guard, Earring, Ring, Necklace ve Mace zincirlerinin 4 adımını şu anki market fiyatlarıyla hesaplar. Tarifler, malzeme miktarları ve beklenen deneme sayıları topluluğun crafting tablosundan ([recipes.py](src/aion2market/recipes.py), Mastery 100):
+**Üretim** sekmesi Guard, Earring, Ring, Necklace, Mace, Longsword ve Greatsword zincirlerinin 4 adımını şu anki market fiyatlarıyla hesaplar. Tarifler, malzeme miktarları ve beklenen deneme sayıları topluluğun crafting tablosundan ([recipes.py](src/aion2market/recipes.py), Mastery 100):
 
 - Her kademe için en ucuz yol: marketten **al** ya da bir önceki kademenin en ucuz yolu + bu adımın malzemesiyle **üret**. Böylece "Artisan's'ı al, 4. adımı üret" gibi karışık yollar da bulunur.
 - Üretim maliyeti = bir denemenin malzemesi × beklenen deneme sayısı (her adımda %25 kombo; 4. adımın normal sonucu ~1,06 deneme).

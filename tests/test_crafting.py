@@ -53,4 +53,4 @@ def test_odyle_morph_used_when_cheaper_and_missing_prices_block_crafting():
 def test_recipe_items_are_always_polled():
     s = Store(":memory:")
     assert recipes.all_keys() <= set(exchange.tracked_keys(s))
-    assert len(recipes.all_keys()) == 52
+    assert len(recipes.all_keys()) == 62

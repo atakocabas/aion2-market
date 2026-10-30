@@ -1,107 +1,180 @@
-"""Crafting chains for buy-or-craft decisions.
+"""Every crafting recipe, for buy-or-craft and craft-and-sell decisions.
 
-Taken from a community crafting sheet (Mastery 100). Each step upgrades the previous tier's item;
-the listed materials are what one attempt consumes. ``tries`` is the expected number of attempts
-for that step's result (25 % combo proc per step; step 4 also has a normal result at ~1.06 tries).
-Item keys are the market's game_item_key (Asmodian / EU ids).
+The recipes (materials and quantities per attempt, output quantity, mastery, race) live in
+recipe_data.py, generated from aion2.app's crafting database, which takes them from NC's game data:
+
+    python -m aion2market.recipes update      # refetch (slowly, a page a second) and rewrite recipe_data.py
+
+Equipment recipes form 4-step chains: each step consumes the previous step's Splendent (combo)
+result, so ``tries`` is the expected number of attempts for that combo (25 % combo proc per step;
+the last step also has a normal result at ~1.06 tries). Everything else (potions, food, scrolls,
+manastones, intermediate materials) is a single recipe. Item keys are the market's game_item_key;
+Elyos and Asmodian items have different keys, so each race has its own chains.
 """
 from __future__ import annotations
 
-ODYLE, FINE_ODYLE, PURE_ODYLE, RADIANT_ODYLE = "610610013", "610610014", "610610015", "610610016"
-REFINING_STONE, EXPERT_STONE, ARTISAN_STONE, ULTIMATE_STONE = "610530001", "610530005", "610530008", "610530010"
-WRATHFUL_MIND = "610511013"
+import argparse
+import html
+import re
+import time
+import urllib.request
+from collections import defaultdict
+from pathlib import Path
+
+from .recipe_data import RECIPES
 
 STEP_TRIES = {1: 4.295471, 2: 4.226813, 3: 4.130642, 4: 4.226543}
-STEP4_NORMAL_TRIES = 1.056636
+LAST_NORMAL_TRIES = 1.056636
+EQUIPMENT_PREFIXES = ("1", "2", "3")        # weapons, armor, accessories; materials and consumables start with 5/6
+COMBO_KEY_STEP = 2                          # Star Dragon Lord 110230019 -> Splendent Star Dragon Lord 110230021
 
 
-def _chain(slot, profession, outputs, step_materials):
-    """outputs: (tier1, tier2, tier3, tier4 normal, tier4 combo) as (key, name)."""
-    t1, t2, t3, t4n, t4c = outputs
-    return {
-        "slot": slot, "profession": profession,
-        "steps": [
-            {"step": 1, "output": t1, "tries": STEP_TRIES[1], "materials": step_materials[0]},
-            {"step": 2, "output": t2, "tries": STEP_TRIES[2], "materials": step_materials[1]},
-            {"step": 3, "output": t3, "tries": STEP_TRIES[3], "materials": step_materials[2]},
-            {"step": 4, "output": t4c, "tries": STEP_TRIES[4], "materials": step_materials[3],
-             "normal_output": t4n, "normal_tries": STEP4_NORMAL_TRIES},
-        ],
-    }
+def is_equipment(key: str) -> bool:
+    return key.startswith(EQUIPMENT_PREFIXES)
 
 
-# materials per step: (item key, name, quantity per attempt)
-CHAINS = [
-    _chain("Guard", "Blacksmithing",
-           (("115050016", "Splendent Orichalcum Guard"), ("115040014", "Expert's Splendent Orichalcum Guard"),
-            ("115030014", "Artisan's Splendent Orichalcum Guard"), ("115030019", "Star Dragon Lord Guard"),
-            ("115030021", "Splendent Star Dragon Lord Guard")),
-           [[("610710001", "Orichalcum Ingot", 3), (REFINING_STONE, "Refining Stone", 5), (ODYLE, "Odyle", 2)],
-            [(EXPERT_STONE, "Expert's Refining Stone", 5), ("610620014", "Fine Orichalcum Ore", 6),
-             (FINE_ODYLE, "Fine Odyle", 3)],
-            [(ARTISAN_STONE, "Artisan's Refining Stone", 5), ("610620015", "Pure Orichalcum Ore", 8),
-             (PURE_ODYLE, "Pure Odyle", 4)],
-            [(ULTIMATE_STONE, "Artisan's Ultimate Refining Stone", 4), ("610710006", "Fine Thick Balaur Horn", 22),
-             (WRATHFUL_MIND, "Wrathful Mind", 10), ("610620016", "Radiant Orichalcum Ore", 9),
-             (RADIANT_ODYLE, "Radiant Odyle", 5)]]),
-    _chain("Earring", "Jewelcrafting",
-           (("310250012", "Splendent Diamond Earrings"), ("310240014", "Expert's Splendent Diamond Earrings"),
-            ("310230014", "Artisan's Splendent Diamond Earrings"), ("310230019", "Star Dragon Lord Earrings"),
-            ("310230021", "Splendent Star Dragon Lord Earrings")),
-           [[("610730020", "Diamond Decoration", 1), (REFINING_STONE, "Refining Stone", 3), (ODYLE, "Odyle", 1)],
-            [(EXPERT_STONE, "Expert's Refining Stone", 3), ("610660029", "Fine Diamond Gemstone", 3),
-             (FINE_ODYLE, "Fine Odyle", 2)],
-            [(ARTISAN_STONE, "Artisan's Refining Stone", 3), ("610660032", "Pure Diamond Gemstone", 4),
-             (PURE_ODYLE, "Pure Odyle", 2)],
-            [(ULTIMATE_STONE, "Artisan's Ultimate Refining Stone", 2),
-             ("610730022", "Enhanced Thick Balaur Scale", 11), (WRATHFUL_MIND, "Wrathful Mind", 5),
-             ("610660035", "Radiant Diamond Gemstone", 5), (RADIANT_ODYLE, "Radiant Odyle", 2)]]),
-    _chain("Ring", "Jewelcrafting",
-           (("310350012", "Splendent Sapphire Ring"), ("310340014", "Expert's Splendent Sapphire Ring"),
-            ("310330014", "Artisan's Splendent Sapphire Ring"), ("310330019", "Star Dragon Lord Ring"),
-            ("310330021", "Splendent Star Dragon Lord Ring")),
-           [[("610730016", "Sapphire Decoration", 1), (REFINING_STONE, "Refining Stone", 2), (ODYLE, "Odyle", 1)],
-            [(EXPERT_STONE, "Expert's Refining Stone", 2), ("610660028", "Fine Sapphire Gemstone", 2),
-             (FINE_ODYLE, "Fine Odyle", 1)],
-            [(ARTISAN_STONE, "Artisan's Refining Stone", 2), ("610660031", "Pure Sapphire Gemstone", 3),
-             (PURE_ODYLE, "Pure Odyle", 1)],
-            [(ULTIMATE_STONE, "Artisan's Ultimate Refining Stone", 2),
-             ("610730022", "Enhanced Thick Balaur Scale", 8), (WRATHFUL_MIND, "Wrathful Mind", 4),
-             ("610660034", "Radiant Sapphire Gemstone", 3), (RADIANT_ODYLE, "Radiant Odyle", 2)]]),
-    _chain("Necklace", "Jewelcrafting",
-           (("310150012", "Splendent Ruby Necklace"), ("310140014", "Expert's Splendent Ruby Necklace"),
-            ("310130014", "Artisan's Splendent Ruby Necklace"), ("310130019", "Star Dragon Lord Necklace"),
-            ("310130021", "Splendent Star Dragon Lord Necklace")),
-           [[("610730021", "Ruby Decoration", 1), (REFINING_STONE, "Refining Stone", 4), (ODYLE, "Odyle", 1)],
-            [(EXPERT_STONE, "Expert's Refining Stone", 4), ("610660030", "Fine Ruby Gemstone", 4),
-             (FINE_ODYLE, "Fine Odyle", 2)],
-            [(ARTISAN_STONE, "Artisan's Refining Stone", 4), ("610660033", "Pure Ruby Gemstone", 5),
-             (PURE_ODYLE, "Pure Odyle", 2)],
-            [(ULTIMATE_STONE, "Artisan's Ultimate Refining Stone", 3),
-             ("610730022", "Enhanced Thick Balaur Scale", 14), (WRATHFUL_MIND, "Wrathful Mind", 6),
-             ("610660036", "Radiant Ruby Gemstone", 6), (RADIANT_ODYLE, "Radiant Odyle", 2)]]),
-    _chain("Mace", "Blacksmithing",
-           (("110750016", "Splendent Orichalcum Mace"), ("110740014", "Expert's Splendent Orichalcum Mace"),
-            ("110730014", "Artisan's Splendent Orichalcum Mace"), ("110730019", "Star Dragon Lord Mace"),
-            ("110730021", "Splendent Star Dragon Lord Mace")),
-           [[("610710001", "Orichalcum Ingot", 3), (REFINING_STONE, "Refining Stone", 5), (ODYLE, "Odyle", 2)],
-            [(EXPERT_STONE, "Expert's Refining Stone", 5), ("610620014", "Fine Orichalcum Ore", 6),
-             (FINE_ODYLE, "Fine Odyle", 3)],
-            [(ARTISAN_STONE, "Artisan's Refining Stone", 5), ("610620015", "Pure Orichalcum Ore", 8),
-             (PURE_ODYLE, "Pure Odyle", 4)],
-            [(ULTIMATE_STONE, "Artisan's Ultimate Refining Stone", 4), ("610710006", "Fine Thick Balaur Horn", 22),
-             (WRATHFUL_MIND, "Wrathful Mind", 10), ("610620016", "Radiant Orichalcum Ore", 9),
-             (RADIANT_ODYLE, "Radiant Odyle", 5)]]),
-]
+def is_npc_item(name: str) -> bool:
+    """Bound shop materials (bottles, ink, solvents, spices): bought from an NPC, never on the market."""
+    return name.endswith("(Bound)")
+
+
+def _chain_of(group: list[dict]) -> dict | None:
+    """One race's recipes for one equipment slot, as a chain, or None if they don't link up."""
+    group = sorted(group, key=lambda r: r["mastery"])
+    inputs = [[m for m in r["materials"] if is_equipment(m[0])] for r in group]
+    if len(group) < 2 or inputs[0] or any(len(i) != 1 for i in inputs[1:]):
+        return None
+    steps = []
+    for n, r in enumerate(group, 1):
+        mats = [tuple(m) for m in r["materials"] if not is_equipment(m[0])]
+        step = {"step": n, "tries": STEP_TRIES.get(n, STEP_TRIES[4]), "materials": mats, "mastery": r["mastery"]}
+        if n < len(group):
+            key, name, _ = inputs[n][0]               # the next step consumes this step's combo result
+            step["output"] = (key, name)
+        else:
+            step["output"] = (str(int(r["key"]) + COMBO_KEY_STEP), f"Splendent {r['name']}")
+            step["normal_output"] = (r["key"], r["name"])
+            step["normal_tries"] = LAST_NORMAL_TRIES
+        steps.append(step)
+    first = group[0]
+    return {"slot": first["category"], "profession": first["profession"], "race": first["race"], "steps": steps}
+
+
+def _build() -> tuple[list[dict], list[dict]]:
+    groups = defaultdict(list)
+    singles = []
+    for r in RECIPES:
+        if is_equipment(r["key"]):
+            groups[(r["race"], r["category"])].append(r)
+        else:
+            singles.append(r)
+    chains = []
+    for group in groups.values():
+        chain = _chain_of(group)
+        if chain:
+            chains.append(chain)
+        else:
+            singles += group
+    order = {"Blacksmithing": 0, "Tailoring": 1, "Jewelcrafting": 2}
+    chains.sort(key=lambda c: (order.get(c["profession"], 9), c["slot"], c["race"] or ""))
+    return chains, singles
+
+
+CHAINS, SINGLES = _build()
+
+
+def recipes_for(key: str) -> list[dict]:
+    """Single recipes that make ``key`` (several when races or batch sizes differ)."""
+    return _BY_PRODUCT.get(key, [])
+
+
+_BY_PRODUCT: dict[str, list[dict]] = defaultdict(list)
+for _r in SINGLES:
+    _BY_PRODUCT[_r["key"]].append(_r)
 
 
 def all_keys() -> set[str]:
-    """Every material and output in the chains, so their prices are always tracked."""
+    """Every tradable material and output in the recipes, so their prices are always tracked."""
     keys = set()
     for chain in CHAINS:
         for step in chain["steps"]:
             keys.add(step["output"][0])
             if "normal_output" in step:
                 keys.add(step["normal_output"][0])
-            keys.update(m[0] for m in step["materials"])
+            keys.update(m[0] for m in step["materials"] if not is_npc_item(m[1]))
+    for r in SINGLES:
+        if not is_npc_item(r["name"]):
+            keys.add(r["key"])
+        keys.update(m[0] for m in r["materials"] if not is_npc_item(m[1]))
     return keys
+
+
+# ---------- updating recipe_data.py from aion2.app ----------
+
+SOURCE = "https://aion2.app/db/crafting?section=craft&group={group}&page={page}"
+PROFESSIONS = ["Blacksmithing", "Tailoring", "Jewelcrafting", "Alchemy", "Cooking"]
+
+
+def parse_page(text: str, profession: str) -> list[dict]:
+    """The recipe cards (<article>) of one aion2.app crafting page."""
+    out = []
+    for art in re.findall(r"<article.*?</article>", text, re.S):
+        product = re.search(r'<a [^>]*href="/db/items/(\d+)"[^>]*>([^<]+)</a>', art)
+        tags = [html.unescape(t.replace("<!-- -->", "")).strip()
+                for t in re.findall(r"<span[^>]*>((?:[^<]|<!-- -->)*)</span>", art[:art.find("Materials")])]
+        mats = [[k, html.unescape(n), int(q)] for k, n, q in re.findall(
+            r'href="/db/items/(\d+)"><img[^>]*/><span[^>]*>([^<]+)</span><span[^>]*>[^<]*?(?:<!-- -->)?(\d+)</span>', art)]
+        if not product or not mats:
+            continue
+        qty = next((int(t[1:]) for t in tags if re.fullmatch(r"[×x]\d+", t)), 1)
+        mastery = next((int(t.split()[-1]) for t in tags if t.startswith("Mastery")), 0)
+        race = next((t for t in tags if t in ("Elyos", "Asmodians")), None)
+        category = next((t for t in tags if not re.fullmatch(r"[×x]\d+", t) and not t.startswith("Mastery")
+                         and t not in ("Elyos", "Asmodians")), "")
+        out.append({"key": product.group(1), "name": html.unescape(product.group(2)).strip(),
+                    "profession": profession, "category": category, "mastery": mastery, "race": race,
+                    "qty": qty, "materials": mats})
+    return out
+
+
+def fetch_all(delay: float = 1.0, progress=print) -> list[dict]:
+    recipes = []
+    for profession in PROFESSIONS:
+        seen_first = None
+        for page in range(1, 50):
+            req = urllib.request.Request(SOURCE.format(group=profession, page=page),
+                                         headers={"User-Agent": "aion2market (recipes)"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                found = parse_page(resp.read().decode("utf-8"), profession)
+            time.sleep(delay)
+            if not found or (seen_first is not None and found[0] == seen_first):
+                break                                  # past the last page (the site repeats page 1)
+            seen_first = seen_first or found[0]
+            recipes += found
+            progress(f"{profession} sayfa {page}: {len(found)} tarif")
+    unique = {}
+    for r in recipes:
+        unique[(r["key"], r["race"], r["qty"], tuple(map(tuple, r["materials"])))] = r
+    return sorted(unique.values(), key=lambda r: (r["profession"], r["category"], r["mastery"], r["key"], r["race"] or ""))
+
+
+def write_data(recipes: list[dict], path: Path = Path(__file__).with_name("recipe_data.py")) -> None:
+    lines = ['"""Generated by `python -m aion2market.recipes update` from aion2.app\'s crafting database. Do not edit."""',
+             "", "RECIPES = ["]
+    lines += [f"    {r!r}," for r in recipes]
+    lines += ["]", ""]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Crafting tariflerini aion2.app'ten günceller.")
+    ap.add_argument("action", choices=["update"])
+    ap.parse_args(argv)
+    recipes = fetch_all()
+    write_data(recipes)
+    print(f"{len(recipes)} tarif yazıldı.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
