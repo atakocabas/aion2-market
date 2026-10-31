@@ -5,7 +5,7 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from aion2market import dashboard
+from aion2market import dashboard, updates
 from aion2market.store import Store
 
 DAY = 86400
@@ -169,6 +169,7 @@ def test_policies_set_the_market_fee():
 
 @pytest.fixture
 def server(tmp_path, monkeypatch):
+    monkeypatch.setattr(updates, "status", lambda: {"available": False})   # no GitHub call from tests
     path = tmp_path / "m.db"
     monkeypatch.setenv("AION2_DB", str(path))
     _store_file = Store(path)

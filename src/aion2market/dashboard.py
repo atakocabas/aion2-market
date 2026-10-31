@@ -22,6 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
 
+from . import __version__, updates
 from .market import sell_fee_pct
 from .store import Store
 
@@ -567,6 +568,7 @@ class Handler(BaseHTTPRequestHandler):
         lang = lang_of(params.get("lang", [""])[0])
         if path in ("/", "/index.html"):
             html = resources.files("aion2market").joinpath("web/index.html").read_bytes()
+            html = html.replace(b"__VERSION__", __version__.encode())
             return self._send(200, html, "text/html; charset=utf-8")
         with _open() as store:
             if path == "/api/items":
@@ -589,7 +591,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(crafting_view(store, server_id, lang))
             if path == "/api/servers":
                 return self._json({"servers": store.servers(), "home": store.home_server(),
-                                   "sync": sync_status(store), "npcap": npcap_status(store)})
+                                   "sync": sync_status(store), "npcap": npcap_status(store),
+                                   "update": updates.status()})
             if path.startswith("/api/item/") and path[10:].isdigit():
                 return self._json(item_detail(store, path[10:], server_id, lang))
         self._send(HTTPStatus.NOT_FOUND, b"not found", "text/plain")

@@ -50,6 +50,9 @@ header .tabs { margin-top: 0; }
 .brand { display: flex; align-items: center; gap: 10px; font: 400 17px/1 var(--display); color: var(--text); letter-spacing: .02em; }
 .brand svg { width: 30px; height: 18px; color: var(--aether); flex: none; }
 .brand span { color: var(--muted); }
+.brand .update { font: 500 11.5px/1 var(--body); color: var(--aether); letter-spacing: 0; text-decoration: none; align-self: flex-end; }
+.brand .update:hover { text-decoration: underline; }
+.brand .ver { font: 500 11px/1 var(--body); color: var(--dim); letter-spacing: 0; align-self: flex-end; }
 h1 { margin: 2px 0 0; font-size: 22px; font-weight: 600; }
 header .spacer { flex: 1; }
 .server, .status, #refresh { margin-bottom: 12px; }
@@ -326,7 +329,7 @@ h3 { font: 400 17px/1.2 var(--display); color: var(--text); margin: 24px 0 8px; 
 <div class="wrap">
   <header>
     <div class="topbar">
-      <div class="brand"><svg viewBox="0 0 30 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M15 16C12 10 7 6 1 5c3 3 4 6 4 9 3-2 6-2 10 2Z"/><path d="M15 16c3-6 8-10 14-11-3 3-4 6-4 9-3-2-6-2-10 2Z"/><path d="M15 3v10"/></svg>Aion 2 <span>Market</span></div>
+      <div class="brand"><svg viewBox="0 0 30 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M15 16C12 10 7 6 1 5c3 3 4 6 4 9 3-2 6-2 10 2Z"/><path d="M15 16c3-6 8-10 14-11-3 3-4 6-4 9-3-2-6-2-10 2Z"/><path d="M15 3v10"/></svg>Aion 2 <span>Market</span><small class="ver" title="Sürüm">v__VERSION__</small><a id="update" class="update" target="_blank" rel="noopener" hidden></a></div>
       <div class="topright">
         <a id="npcap" class="npcap" target="_blank" rel="noopener"></a>
         <div class="seg" id="lang" title="Dil"><button data-l="tr">TR</button><button data-l="en">EN</button></div>
@@ -661,6 +664,8 @@ const EN = {
     "While on, the market prices you see in game go to a shared store, and what other players see comes to you, so the market stays current even when you don't open it. No character, account or session data is sent.",
 "Npcap kurulumu aktif": "Npcap installation active",
   "Canlı kayıt çalışmıyor": "Live recording not working",
+  "Yeni sürüm {0} · indir": "New version {0} · download",
+  "Yeni sürüm çıktı, indirmek için tıkla": "A new version is out, click to download",
   "Canlı kayıt çalışmıyor: {0}": "Live recording not working: {0}",
   "Item adları NCSOFT'tan alınamıyor ({0}); ortak veriden gelmesi bekleniyor.":
     "Item names can't be fetched from NCSOFT ({0}); waiting for them from shared data.",
@@ -1424,6 +1429,13 @@ async function loadServers() {
     : t("Npcap kurarsan oyunda açtığın pazar aramaları anında kaydedilir; en güncel fiyatlar böyle gelir."))
     + (np.names_error ? "\n" + t("Item adları NCSOFT'tan alınamıyor ({0}); ortak veriden gelmesi bekleniyor.", np.names_error) : "");
   if (np.installed) nel.removeAttribute("href"); else nel.href = np.url;
+  const up = servers.update || {}, uel = document.getElementById("update");
+  uel.hidden = !up.available;
+  if (up.available) {
+    uel.textContent = t("Yeni sürüm {0} · indir", up.latest.replace(/^v/i, ""));
+    uel.title = t("Yeni sürüm çıktı, indirmek için tıkla");
+    uel.href = up.url;
+  }
 }
 
 async function refresh() {
