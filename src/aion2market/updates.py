@@ -27,8 +27,8 @@ def parse(version: str | None) -> tuple[int, ...] | None:
     return tuple(int(p) for p in parts) if all(p.isdigit() for p in parts) else None
 
 
-def is_newer(latest: str | None, current: str = __version__) -> bool:
-    a, b = parse(latest), parse(current)
+def is_newer(latest: str | None, current: str | None = None) -> bool:
+    a, b = parse(latest), parse(current or __version__)
     return a is not None and b is not None and a > b
 
 
