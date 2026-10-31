@@ -140,6 +140,25 @@ def test_exchange_rows_are_not_uploaded_to_the_shared_store():
     assert [r[1] for b in sent if b for r in b.get("snapshots", [])] == ["1"]
 
 
+def test_on_by_default_for_own_server_until_disabled():
+    s = Store(":memory:")
+    assert exchange.server_of(s) is None                              # game never opened the market: nothing to ask
+    s.add_snapshots(NOW - 60, 12306, [("1", 5.0, 1)])
+    urls = []
+
+    def fake(url):
+        urls.append(url)
+        return _payload((1, 4, 2, ISO_NOW))
+    exchange.import_once(s, fetcher=fake, now=NOW, delay=0)
+    assert exchange.server_of(s) == 12306 and "server=12306" in urls[0]
+    s.set_meta("exchange.server", "12315")                            # chosen with `setup`
+    assert exchange.server_of(s) == 12315
+    s.set_meta("exchange.enabled", "0")                               # what `exchange disable` writes
+    urls.clear()
+    assert exchange.server_of(s) is None and "kapalı" in exchange.import_once(s, fetcher=fake, now=NOW, delay=0)[0]
+    assert urls == []
+
+
 def test_errors_are_reported_not_raised():
     s = Store(":memory:")
     s.add_snapshots(NOW, 12306, [("1", 5.0, 1)])

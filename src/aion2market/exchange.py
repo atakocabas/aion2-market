@@ -10,10 +10,13 @@ are never re-uploaded to the shared store, and fresh ones on your own server can
 trigger watchlist alerts. Requests are few and identify this tool honestly; be
 gentle with someone else's service.
 
-    python -m aion2market.exchange setup 12306      # market server id, as in aion2.exchange URLs (?server=)
+On by default for this computer's own market server (the one its game client used
+last); until the game has opened the market once there is nothing to fetch.
+
+    python -m aion2market.exchange setup 12306      # another server id, as in aion2.exchange URLs (?server=)
     python -m aion2market.exchange now
     python -m aion2market.exchange history           # one-time: 30 days of 6-hour price ranges per item
-    python -m aion2market.exchange disable
+    python -m aion2market.exchange disable | enable
 """
 from __future__ import annotations
 
@@ -31,7 +34,7 @@ from . import alerts
 from .store import Store
 
 API = "https://aion2.exchange/api"
-USER_AGENT = "aion2market personal price tracker (single user)"
+USER_AGENT = "aion2market price tracker (+https://github.com/atakocabas/aion2-market)"
 BATCH = 100                  # item keys per request
 DELAY = 2.0                  # seconds between requests
 INTERVAL = 30 * 60           # service poll interval; the site itself samples about once an hour
@@ -190,6 +193,14 @@ def backfill(store: Store, server_id: int, range_: str = "30d", fetcher: Callabl
     return done, skipped, errors
 
 
+def server_of(store: Store) -> int | None:
+    """The server to fetch: the one chosen with `setup`, else this computer's own; None while switched off."""
+    if store.get_meta("exchange.enabled", "1") != "1":
+        return None
+    server = store.get_meta("exchange.server")
+    return int(server) if server else store.home_server()
+
+
 def tracked_keys(store: Store) -> list[str]:
     """Every item seen in any market so far, the watchlist, and all crafting-chain items."""
     from .recipes import all_keys
@@ -200,10 +211,10 @@ def tracked_keys(store: Store) -> list[str]:
 def import_once(store: Store, fetcher: Callable[[str], dict] = http_json, notifier=None,
                 now: float | None = None, delay: float = DELAY) -> list[str]:
     now = now or time.time()
-    server = store.get_meta("exchange.server")
-    if not server:
-        return ["aion2.exchange ayarlı değil: python -m aion2market.exchange setup <sunucu-id>"]
-    server_id = int(server)
+    server_id = server_of(store)
+    if server_id is None:
+        return ["aion2.exchange kapalı ya da sunucun henüz bilinmiyor (oyunda marketi bir kez aç "
+                "ya da: python -m aion2market.exchange setup <sunucu-id>)"]
     keys = tracked_keys(store)
     if not keys:
         return []
@@ -247,12 +258,13 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("history", help="geçmiş fiyat aralıklarını bir kez doldur (item başına bir istek)")
     p.add_argument("--range", default="30d", help="ör. 7d, 30d (varsayılan 30d)")
     sub.add_parser("disable", help="kapat")
+    sub.add_parser("enable", help="aç (varsayılan)")
     args = ap.parse_args(argv)
     store = Store(args.db)
     try:
         if args.cmd == "history":
-            server = store.get_meta("exchange.server")
-            if not server:
+            server = server_of(store)
+            if server is None:
                 print("Önce: python -m aion2market.exchange setup <sunucu-id>")
                 return 1
             n = len(tracked_keys(store))
@@ -260,17 +272,17 @@ def main(argv: list[str] | None = None) -> int:
 
             def show(i, total, key, what):
                 print(f"[{i}/{total}] {key}  {what}", flush=True)
-            done, skipped, errors = backfill(store, int(server), args.range, progress=show)
+            done, skipped, errors = backfill(store, server, args.range, progress=show)
             print(f"Bitti: {done} item yüklendi, {skipped} item zaten yüklüydü, {errors} hata.")
             return 0
         if args.cmd == "setup":
             store.set_meta("exchange.server", str(args.server_id))
+            store.set_meta("exchange.enabled", "1")
             print(f"Sunucu {args.server_id} kaydedildi. Servis çalışırken {INTERVAL // 60} dakikada bir alınır; "
                   "şimdi denemek için: exchange now")
-        elif args.cmd == "disable":
-            store.db.execute("DELETE FROM meta WHERE key LIKE 'exchange.%'")
-            store.db.commit()
-            print("aion2.exchange kapatıldı.")
+        elif args.cmd in ("disable", "enable"):
+            store.set_meta("exchange.enabled", "1" if args.cmd == "enable" else "0")
+            print("aion2.exchange " + ("açıldı." if args.cmd == "enable" else "kapatıldı."))
         else:
             for line in import_once(store) or ["Yeni fiyat yok."]:
                 print(line)

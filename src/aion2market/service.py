@@ -179,9 +179,9 @@ def _sync_loop(db: Path, stop: threading.Event, notifier, every: float = 60.0) -
 
 
 def _exchange_loop(db: Path, stop: threading.Event, notifier) -> None:
-    """Pull prices for the configured server from aion2.exchange every few minutes."""
+    """Pull prices for this computer's market server (or the chosen one) from aion2.exchange every few minutes."""
     def body(store):
-        if store.get_meta("exchange.server"):
+        if exchange.server_of(store) is not None:
             for line in exchange.import_once(store, notifier=notifier):
                 print(line, flush=True)
     while not stop.is_set():
@@ -256,10 +256,10 @@ def run_live(args, store: Store) -> int:
     if sync.share_url(store):
         print(f"Ortak veri {'açık' if sync.enabled(store) else 'kapalı'}: açıkken her dakika eşitlenir")
     threading.Thread(target=_sync_loop, args=(args.db, stop_names, notifier), daemon=True).start()
-    if store.get_meta("exchange.server"):
-        print(f"aion2.exchange açık: sunucu {store.get_meta('exchange.server')}, "
+    if exchange.server_of(store) is not None:
+        print(f"aion2.exchange açık: sunucu {exchange.server_of(store)}, "
               f"{exchange.INTERVAL // 60} dakikada bir")
-    # Always running: the server can be chosen in the window later.
+    # Always running: the server becomes known once the game opens the market.
     threading.Thread(target=_exchange_loop, args=(args.db, stop_names, notifier), daemon=True).start()
     next_poll = time.time() + 1.0
     try:

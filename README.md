@@ -245,20 +245,21 @@ Birden fazla kişi kullanıyorsa herkesin gördüğü fiyatlar ortak bir Cloudfl
 
 ### aion2.exchange'den fiyat alma
 
-[aion2.exchange](https://aion2.exchange/) bütün sunucuların market fiyatlarını tutuyor. Bir sunucunun fiyatlarını oradan da alabilirsin; bunun için oyunun açık olması gerekmez.
+[aion2.exchange](https://aion2.exchange/) bütün sunucuların market fiyatlarını tutuyor. Uygulama varsayılan olarak kendi sunucunun (oyunun marketi en son açtığı sunucu) fiyatlarını oradan da alır; oyunu bir kez açıp marketi açman yeterli, sonrasında oyun kapalıyken de gelir.
 
 ```bash
-# Sunucu kodu: aion2.exchange'de sunucunu seçince adresteki ?server= değeri (ör. EU Zemurru = 12315)
+# Başka bir sunucu: aion2.exchange'de sunucunu seçince adresteki ?server= değeri (ör. EU Zemurru = 12315)
 .venv\Scripts\python -m aion2market.exchange setup <sunucu-id>
 .venv\Scripts\python -m aion2market.exchange now        # hemen dene
-.venv\Scripts\python -m aion2market.exchange disable
+.venv\Scripts\python -m aion2market.exchange disable    # kapat (enable ile tekrar açılır)
 ```
 
-- `service run` ayarlıysa 30 dakikada bir alır (site saatte bir örnek alıyor). Bilinen itemleri 100'erli gruplar halinde, istekler arasında 2 saniye bekleyerek sorgular; kendini `aion2market personal price tracker` olarak tanıtır.
+- Uygulama ya da `service run` çalışırken 30 dakikada bir alır (site saatte bir örnek alıyor). Bilinen itemleri 100'erli gruplar halinde, istekler arasında 2 saniye bekleyerek sorgular; kendini `aion2market price tracker` ve bu deponun adresiyle tanıtır.
+- Her item için hangi kaynaktan gelirse gelsin (kendi oyunun, ortak depo, aion2.exchange) en yeni fiyat gösterilir.
 - Geçmiş: `.venv\Scripts\python -m aion2market.exchange history` her item için bir kez 30 günlük, 6 saatlik dilimleri (en düşük, en yüksek, ortalama, son fiyat, ilan sayısı) indirir. Item başına bir istek ve aralarında 2 saniye beklediği için ~580 item yaklaşık 20 dakika sürer. Yarıda kesilirse kaldığı yerden devam eder; bir kez yüklenen item tekrar istenmez. Dilimler `price_ranges` tablosuna, dilim sonu fiyatları fiyat geçmişine yazılır. Detay panelindeki grafikte mavi bant olarak görünür. Sitenin geçmişi 6 Ekim 2026'dan başlıyor, bu yüzden 30 günlük değişim şimdilik `*` ile işaretli kalır.
 - Kayıtlar `origin = 'exchange'` olarak saklanır, arayüzde o sunucunun fiyatları arasında görünür. Ortak Cloudflare deposuna asla yüklenmez.
 - Kendi sunucunun taze (son 30 dakika) fiyatları izleme listesi bildirimlerini tetikleyebilir.
-- Bu, başkasının ücretsiz hizmeti. Sitenin robots.txt dosyası yapay zeka ajanlarını engelliyor ve verinin "referans" amaçlı kullanılmasını istiyor. Kişisel kullanımda tut, aralığı kısaltma; site sahibi itiraz ederse `disable` ile kapat.
+- Bu, başkasının ücretsiz hizmeti. Sitenin robots.txt dosyası yapay zeka ajanlarını engelliyor ve verinin "referans" amaçlı kullanılmasını istiyor. Aralığı kısaltma; site sahibi itiraz ederse varsayılanı kapat (`exchange.enabled`) ve yeni sürüm çıkar.
 
 ## Bildirimler (Faz 4)
 
