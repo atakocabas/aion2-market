@@ -1,6 +1,6 @@
 [project]
 name = "aion2market"
-version = "0.3.3"
+version = "0.3.4"
 description = "Aion 2 market price tracker (passive Npcap capture)"
 requires-python = ">=3.11"
 dependencies = [
