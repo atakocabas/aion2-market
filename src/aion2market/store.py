@@ -121,6 +121,15 @@ MIGRATIONS = [
     ("listings", "origin", "TEXT NOT NULL DEFAULT 'local'"),
 ]
 
+# Made after MIGRATIONS, since they use columns older databases only get there.
+INDEXES = """
+-- one server's whole series in time order (the UI's main query), read from the index alone
+CREATE INDEX IF NOT EXISTS price_snapshots_server_ts
+    ON price_snapshots (server_id, ts, item_key, min_unit_price, sale_count, origin);
+-- this computer's own newest snapshot (home_server)
+CREATE INDEX IF NOT EXISTS price_snapshots_origin_ts ON price_snapshots (origin, ts);
+"""
+
 
 class Store:
     def __init__(self, path: Path | str):
@@ -128,11 +137,16 @@ class Store:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         # The service, its background threads, the UI and the MCP server share one file.
         self.db = sqlite3.connect(str(path), timeout=15)
+        if str(path) != ":memory:":
+            # WAL lets the UI and MCP server read while the service writes; the mode stays with the file.
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA synchronous=NORMAL")
         self.db.executescript(SCHEMA)
         for table, column, definition in MIGRATIONS:
             cols = {r[1] for r in self.db.execute(f"PRAGMA table_info({table})")}
             if column not in cols:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+        self.db.executescript(INDEXES)
         self.db.commit()
 
     def close(self) -> None:

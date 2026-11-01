@@ -108,8 +108,11 @@ def last_scan(series: dict[str, list[tuple]], now: float) -> float | None:
 
 def default_server(store: Store) -> int | None:
     """This computer's own market server, else the one with the newest data."""
+    home = store.home_server()
+    if home:
+        return home
     servers = store.servers()
-    return store.home_server() or (servers[0]["server_id"] if servers else None)
+    return servers[0]["server_id"] if servers else None
 
 
 def load_series(store: Store, server_id: int | None) -> dict[str, list[tuple[float, float, int]]]:
