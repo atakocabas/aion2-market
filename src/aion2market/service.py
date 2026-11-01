@@ -26,8 +26,8 @@ from pathlib import Path
 from . import alerts, exchange, iteminfo, sync
 from .http1 import HttpStream
 from .inventory import GameTracker
-from .procnet import DEFAULT_PROCESS_PATTERN, find_game_pids, game_connections
 from .market import MARKET_HOST, fmt_price, handle_exchange
+from .procnet import DEFAULT_PROCESS_PATTERN, find_game_pids, game_connections
 from .reassembly import Data, Gap, StreamReassembler
 from .store import Store
 from .tls13 import KeyLog, TlsConnection, client_hello_sni
@@ -320,6 +320,7 @@ def set_capture_status(store: Store, error: str | None) -> None:
 def market_interfaces(default: str, host: str = MARKET_HOST) -> list[str]:
     """The default interface plus the one the route to the market server uses, if that differs."""
     import socket
+
     from .capture import _route_iface
     ifaces = [default]
     try:

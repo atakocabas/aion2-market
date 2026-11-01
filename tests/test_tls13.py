@@ -18,7 +18,7 @@ def _record(secret: bytes, seq: int, inner_type: int, data: bytes) -> bytes:
     hash_fn = SUITES[0x1301][2]
     key = hkdf_expand_label(secret, "key", 16, hash_fn)
     iv = hkdf_expand_label(secret, "iv", 12, hash_fn)
-    nonce = bytes(a ^ b for a, b in zip(iv, seq.to_bytes(12, "big")))
+    nonce = bytes(a ^ b for a, b in zip(iv, seq.to_bytes(12, "big"), strict=True))
     plain = data + bytes([inner_type])
     header = b"\x17\x03\x03" + (len(plain) + 16).to_bytes(2, "big")
     return header + AESGCM(key).encrypt(nonce, plain, header)

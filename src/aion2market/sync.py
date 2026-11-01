@@ -28,7 +28,6 @@ import os
 import time
 import urllib.error
 import urllib.request
-from collections import defaultdict
 
 from . import alerts
 from .store import Store

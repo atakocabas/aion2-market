@@ -73,7 +73,7 @@ def _play_sound() -> None:
 
 
 class Card:
-    def __init__(self, host: "Host", msg: dict):
+    def __init__(self, host: Host, msg: dict):
         self.host = host
         s = host.scale
         self.win = w = tk.Toplevel(host.root)
@@ -172,7 +172,7 @@ class Card:
 
 
 class Host:
-    def __init__(self, source: "queue.Queue[dict | None]"):
+    def __init__(self, source: queue.Queue[dict | None]):
         if sys.platform == "win32":
             try:
                 ctypes.windll.shcore.SetProcessDpiAwareness(1)

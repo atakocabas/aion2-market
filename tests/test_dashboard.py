@@ -99,7 +99,7 @@ def test_deals_pick_recent_drops_below_normal_and_explain_why():
     s = Store(":memory:")
     days = (20, 15, 10, 8, 6, 4, 2)
     _series(s, "dip", [(NOW - d * DAY, 100.0) for d in days] + [(NOW - 60, 60.0)])         # sudden 40 % dip
-    _series(s, "slide", [(NOW - d * DAY, p) for d, p in zip(days, (100, 100, 100, 100, 70, 65, 62))]
+    _series(s, "slide", [(NOW - d * DAY, p) for d, p in zip(days, (100, 100, 100, 100, 70, 65, 62), strict=True)]
             + [(NOW - 60, 50.0)])                                                            # week-long slide
     _series(s, "flat", [(NOW - d * DAY, 100.0) for d in days] + [(NOW - 60, 99.0)])         # no real discount
     _series(s, "new", [(NOW - 2 * DAY, 100.0), (NOW - DAY, 100.0), (NOW - 3600, 100.0),
