@@ -50,7 +50,13 @@ ignore = [
 
 [tool.mypy]
 files = ["src/aion2market/store.py", "src/aion2market/dashboard.py", "src/aion2market/sync.py",
-         "src/aion2market/updates.py"]
+         "src/aion2market/updates.py", "src/aion2market/__init__.py", "src/aion2market/__main__.py",
+         "src/aion2market/alerts.py", "src/aion2market/app.py", "src/aion2market/capture.py",
+         "src/aion2market/crafting.py", "src/aion2market/exchange.py", "src/aion2market/http1.py",
+         "src/aion2market/iteminfo.py", "src/aion2market/market.py", "src/aion2market/mcp_server.py",
+         "src/aion2market/popup.py", "src/aion2market/procnet.py", "src/aion2market/protocol.py",
+         "src/aion2market/reassembly.py", "src/aion2market/recipe_data.py", "src/aion2market/recipes.py",
+         "src/aion2market/report.py", "src/aion2market/service.py", "src/aion2market/tls13.py"]
 mypy_path = "src"
 ignore_missing_imports = true
 # Use the rest of the package for types, but report errors only in the files listed above.

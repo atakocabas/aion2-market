@@ -49,18 +49,18 @@ def _num(v: float | None):
     return None if v is None else (int(v) if float(v).is_integer() else v)
 
 
-def _resolve(store: Store, item: str) -> tuple[str | None, dict | None]:
-    """(item_key, None) or (None, error dict)."""
+def _resolve(store: Store, item: str) -> str | dict:
+    """item_key, or an error dict."""
     item = item.strip()
     keys = store.resolve(item)
     if not keys:
-        return None, {"error": f"No item named '{item}'. Use the numeric game_item_key, or name it with name_item.",
+        return {"error": f"No item named '{item}'. Use the numeric game_item_key, or name it with name_item.",
                       "known_items": [n for _, n in store.named_items()]}
     exact = [k for k in keys if (store.name(k) or "").lower() == item.lower()]
     if len(keys) > 1 and len(exact) != 1:
-        return None, {"error": f"'{item}' matches several items; be more specific.",
+        return {"error": f"'{item}' matches several items; be more specific.",
                       "matches": [{"item_key": k, "name": store.name(k)} for k in keys]}
-    return (exact or keys)[0], None
+    return (exact or keys)[0]
 
 
 def _item(store: Store, key: str) -> dict:
@@ -98,8 +98,8 @@ def get_price(item: str, server_id: int | None = None) -> dict:
     includes the cheapest single-unit listing. `server_id` defaults to the user's
     own market server; see list_servers."""
     with _open() as store:
-        key, err = _resolve(store, item)
-        return err or _price(store, key, server_id)
+        key = _resolve(store, item)
+        return key if isinstance(key, dict) else _price(store, key, server_id)
 
 
 @server.tool()
@@ -115,9 +115,9 @@ def list_servers() -> dict:
 def price_history(item: str, days: float = 7, server_id: int | None = None) -> dict:
     """Recorded price points of an item over the last `days` days, oldest first."""
     with _open() as store:
-        key, err = _resolve(store, item)
-        if err:
-            return err
+        key = _resolve(store, item)
+        if isinstance(key, dict):
+            return key
         server_id = _server(store, server_id)
         since = time.time() - days * 86400
         fmt = "%Y-%m-%d %H:%M"
@@ -144,9 +144,9 @@ def cheapest_listings(item: str, limit: int = 10, quantity: int | None = None,
 
     `quantity` keeps only listings of exactly that stack size (e.g. 1)."""
     with _open() as store:
-        key, err = _resolve(store, item)
-        if err:
-            return err
+        key = _resolve(store, item)
+        if isinstance(key, dict):
+            return key
         server_id = _server(store, server_id)
         ts, rows = store.latest_listings(key, server_id)
         if not rows:
@@ -167,9 +167,9 @@ def watch_item(item: str, target_price: float | None = None) -> dict:
     target, it fires at 20 % under the item's 7-day average. Setting a new
     target starts over."""
     with _open() as store:
-        key, err = _resolve(store, item)
-        if err:
-            return err
+        key = _resolve(store, item)
+        if isinstance(key, dict):
+            return key
         store.watch(key, target_price, time.time())
         return {"watching": _item(store, key), "target_price": _num(target_price)}
 
@@ -178,9 +178,9 @@ def watch_item(item: str, target_price: float | None = None) -> dict:
 def unwatch_item(item: str) -> dict:
     """Remove an item from the watchlist."""
     with _open() as store:
-        key, err = _resolve(store, item)
-        if err:
-            return err
+        key = _resolve(store, item)
+        if isinstance(key, dict):
+            return key
         return {**_item(store, key), "removed": store.unwatch(key)}
 
 

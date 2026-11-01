@@ -78,7 +78,7 @@ def split_frames(b: bytes, base: int = 0, compressed: bool = False) -> Iterator[
 
 def parse_stream(b: bytes) -> tuple[list[Frame], int]:
     """Parse a whole s2c stream; return (frames, bytes consumed)."""
-    frames = []
+    frames: list[Frame] = []
     for f in split_frames(b):
         if isinstance(f, int):
             return frames, f

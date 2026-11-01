@@ -79,7 +79,7 @@ def check(store: Store, prices: dict[str, float], ts: float) -> list[Alert]:
 class PopupHost:
     """Keeps one ``aion2market.popup`` process alive and streams card messages to it."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.proc: subprocess.Popen | None = None
         self.lock = threading.Lock()          # packet loop and sync thread both send cards
 
@@ -97,6 +97,7 @@ class PopupHost:
                     cmd, stdin=subprocess.PIPE,
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            assert self.proc.stdin is not None          # started with stdin=PIPE
             try:
                 self.proc.stdin.write(line)
                 self.proc.stdin.flush()
@@ -109,6 +110,7 @@ class PopupHost:
         """Let the window finish its cards and exit; returns its exit code when waited for."""
         if self.proc is None:
             return None
+        assert self.proc.stdin is not None              # started with stdin=PIPE
         try:
             self.proc.stdin.close()
         except OSError:

@@ -64,7 +64,7 @@ def _build() -> tuple[list[dict], list[dict]]:
     groups = defaultdict(list)
     singles = []
     for r in RECIPES:
-        if is_equipment(r["key"]):
+        if is_equipment(str(r["key"])):
             groups[(r["race"], r["category"])].append(r)
         else:
             singles.append(r)
