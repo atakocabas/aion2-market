@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS price_ranges (
     samples   INTEGER,
     PRIMARY KEY (server_id, item_key, ts, span)
 );
--- the character's inventory as the game sent it at each login (opcode 0x5611)
+-- the character's bag at each login (opcode 0x5611); the newest snapshot follows changes during play
 CREATE TABLE IF NOT EXISTS inventory (
     ts       REAL NOT NULL,
     item_key TEXT NOT NULL,
@@ -215,6 +215,13 @@ class Store:
         self.db.executemany("INSERT OR REPLACE INTO inventory VALUES (?, ?, ?)",
                             [(ts, k, c) for k, c in items.items()])
         self.db.commit()
+
+    def update_inventory(self, ts: float, items: dict[str, int]) -> None:
+        """Replace the newest snapshot with ``items`` at ``ts``; older logins stay."""
+        with self.db:
+            self.db.execute("DELETE FROM inventory WHERE ts = (SELECT MAX(ts) FROM inventory)")
+            self.db.executemany("INSERT OR REPLACE INTO inventory VALUES (?, ?, ?)",
+                                [(ts, k, c) for k, c in items.items()])
 
     def latest_inventory(self) -> tuple[float | None, dict[str, int]]:
         ts = self.db.execute("SELECT MAX(ts) FROM inventory").fetchone()[0]

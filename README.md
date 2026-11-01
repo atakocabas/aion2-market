@@ -202,7 +202,7 @@ Puan = indirim % × 30 günlük aralığın dibine yakınlık (1,0–1,5) × ila
 
 ### Envanterim sayfası (ne satılmalı)
 
-Servis, oyunun kendi bağlantısının sunucudan gelen tarafını da pasif olarak okur (ExitLag varsa loopback üzerinden). Oyuna her girişte sunucu envanterin tamamını tek bir mesajla (opcode `0x5611`) gönderir; servis bunu `inventory` tablosuna yazar. Oyuna hiçbir şey gönderilmez. Kapatmak için: `service run --no-inventory`.
+Servis, oyunun kendi bağlantısının sunucudan gelen tarafını da pasif olarak okur (ExitLag varsa loopback üzerinden). Oyuna her girişte sunucu envanterin tamamını tek bir mesajla (opcode `0x5611`) gönderir; servis bunu `inventory` tablosuna yazar. Oyun sırasında her değişiklik (loot, kullanma, depoya koyma, Kinah) ayrı bir mesajla (`0x561b`) gelir; servis son kaydı bunlarla canlı günceller. Sayfadaki zaman, son değişikliğin zamanıdır. Oyuna hiçbir şey gönderilmez. Kapatmak için: `service run --no-inventory`.
 
 **Envanterim** sekmesi, markette ilanı olan her item için şunları gösterir: adet, şu anki fiyat, 7 gün ortalaması, ortalamaya göre fark, son listeleme ve 7 gün değişimi, kesinti sonrası toplam değer ve öneri:
 
@@ -212,7 +212,7 @@ Servis, oyunun kendi bağlantısının sunucudan gelen tarafını da pasif olara
 
 Varsayılan sıralama 7 günde en çok yükselenden; son listeleme, 7 gün ortalamasının üstünde olma ve toplam değere göre de sıralanabilir. Sağ üstteki kartta haftanın en pahalı günü (satmak için) yazar.
 
-Sınırlar: envanter oyuna girişte güncellenir, oyun içindeki anlık değişiklikler henüz okunmuyor. Depo (stash) ayrı bir mesajla geliyor olmalı; henüz eklenmedi. Kayıtlı bir yakalamadan içe aktarmak için: `.venv\Scripts\python -m aion2market.inventory import captures\<kayıt>`.
+Sınırlar: yalnızca çanta sayılır; depo (warehouse) ve kuşanılmış ekipman aynı mesajlarda gelir ama envantere katılmaz. Servis oyun açıkken başlatıldıysa canlı güncelleme bir sonraki girişe kadar bekler (değişiklikler, girişte gelen listeye göre uygulanır). Markette alım satımın ve postanın nasıl geldiği henüz kaydedilmedi. Kayıtlı bir yakalamadan içe aktarmak için: `.venv\Scripts\python -m aion2market.inventory import captures\<kayıt>`.
 
 ### Üretim sayfası (al mı, üret mi)
 

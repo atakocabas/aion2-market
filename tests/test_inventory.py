@@ -8,9 +8,12 @@ NOW = 1_800_000_000.0
 DAY = 86400
 
 
+_ids = iter(range(1, 60000))
+
+
 def _record(key: int, count: int, tail: bytes = b"\x01\x1d" + bytes(13)) -> bytes:
-    # 8-byte id (ends in two zero bytes) | u32 key | u64 count | slot/flags
-    return b"\x54\x5e\x0d\x00\x00\x25\x00\x00" + struct.pack("<IQ", key, count) + tail
+    # 8-byte id (unique, ends in two zero bytes) | u32 key | u64 count | container (1 = bag) | slot/flags
+    return b"\x54" + struct.pack("<H", next(_ids)) + b"\x00\x00\x25\x00\x00" + struct.pack("<IQ", key, count) + tail
 
 
 def _payload(*records: bytes) -> bytes:
@@ -20,6 +23,7 @@ def _payload(*records: bytes) -> bytes:
 def test_parse_inventory_sums_slots_and_skips_lookalikes():
     noise = b"\x00\x01" + struct.pack("<I", 610610015) + struct.pack("<Q", 9231951234095710525)  # key, bogus count
     payload = _payload(_record(610610015, 15), _record(510716014, 9), _record(610610015, 3), noise,
+                       _record(510716014, 40, b"\x0f\x02" + bytes(13)),                    # warehouse: not counted
                        b"\x07\x08" + struct.pack("<IQ", 510716014, 5))                       # no zero bytes before
     assert parse_inventory(payload, {610610015, 510716014}) == {"610610015": 18, "510716014": 9}
 

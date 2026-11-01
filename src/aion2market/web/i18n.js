@@ -47,8 +47,8 @@ const EN = {
   "Bu meslekte tek adımlı tarif yok.": "No single-step recipes in this profession.",
   "son adım üret-sat: {0}": "last step craft-and-sell: {0}",
   // page sections
-  "Envanter değeri": "Inventory value", "Satılmaya değer": "Worth selling", "Envanter zamanı": "Inventory time",
-  "oyuna her girişte güncellenir": "updated every time you log in", "Satış günü": "Best day to sell",
+  "Envanter değeri": "Inventory value", "Satılmaya değer": "Worth selling", "Envanter zamanı": "Inventory updated",
+  "oyun sırasında canlı güncellenir": "updated live while you play", "Satış günü": "Best day to sell",
   "7 günde yükselen": "Rose in 7 days", "Son listelemede yükselen": "Rose since last listing",
   "7 gün ort. üstünde": "Over 7-day avg.", "Değer": "Value", "Sat": "Sell", "Normal": "Normal", "Bekle": "Wait",
   "Kontrol et": "Check", "Hedefe yakınlık": "Closest to target", "7 günde düşen": "Fell in 7 days", "Ada göre": "By name",
