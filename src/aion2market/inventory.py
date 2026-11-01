@@ -72,7 +72,8 @@ def _change_at(payload: bytes, p: int) -> bool:
 def parse_changes(payload: bytes) -> list[tuple[int, bytes, Stack]]:
     """The records of a 0x561b as (op, id, stack). Tails differ in length, so each later record is
     searched for from 39 bytes past the previous id."""
-    n, out, p = payload[0] if payload else 0, [], 3
+    out: list[tuple[int, bytes, Stack]] = []
+    n, p = payload[0] if payload else 0, 3
     while len(out) < n:
         while p + 23 <= len(payload) and not _change_at(payload, p):
             p += 1
@@ -120,7 +121,7 @@ def known_keys(store: Store) -> set[int]:
 
 
 class GameConnection:
-    def __init__(self):
+    def __init__(self) -> None:
         self.stream = StreamReassembler()
         self.buf = bytearray()
         self.broken = False
@@ -149,7 +150,8 @@ class GameTracker:
         return lines
 
     def _replay(self) -> list[str]:
-        lines, keep = [], deque(maxlen=self.pending.maxlen)
+        lines: list[str] = []
+        keep: deque[dict] = deque(maxlen=self.pending.maxlen)
         cutoff = time.time() - PENDING_SECONDS
         for p in self.pending:
             if self._match(p):
@@ -171,7 +173,7 @@ class GameTracker:
             return []
         if conn.broken:
             return []
-        lines = []
+        lines: list[str] = []
         for ev in conn.stream.feed(p["seq"], p["payload"], syn=p["syn"]):
             if isinstance(ev, Gap):
                 conn.broken = True          # framing is lost; the next login starts a new connection
