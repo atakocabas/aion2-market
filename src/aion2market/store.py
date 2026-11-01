@@ -106,6 +106,13 @@ CREATE TABLE IF NOT EXISTS inventory (
     count    INTEGER NOT NULL,
     PRIMARY KEY (ts, item_key)
 );
+-- the character's warehouse (container 15 of the same messages), kept the same way
+CREATE TABLE IF NOT EXISTS warehouse (
+    ts       REAL NOT NULL,
+    item_key TEXT NOT NULL,
+    count    INTEGER NOT NULL,
+    PRIMARY KEY (ts, item_key)
+);
 -- small key/value state, e.g. sync cursors
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
@@ -211,23 +218,51 @@ class Store:
             "SELECT ts, span, low, high, avg, close, listings FROM price_ranges "
             "WHERE item_key = ? AND server_id = ? AND ts >= ? ORDER BY ts", (item_key, server_id, since)).fetchall()
 
-    def set_inventory(self, ts: float, items: dict[str, int]) -> None:
-        self.db.executemany("INSERT OR REPLACE INTO inventory VALUES (?, ?, ?)",
-                            [(ts, k, c) for k, c in items.items()])
+    # Item snapshot tables (bag, warehouse). Table names only ever come from this fixed set.
+    _SNAPSHOT_TABLES = frozenset({"inventory", "warehouse"})
+
+    def _snapshot_table(self, table: str) -> str:
+        if table not in self._SNAPSHOT_TABLES:
+            raise ValueError(f"not a snapshot table: {table!r}")
+        return table
+
+    def _set_snapshot(self, table: str, ts: float, items: dict[str, int]) -> None:
+        t = self._snapshot_table(table)
+        self.db.executemany(f"INSERT OR REPLACE INTO {t} VALUES (?, ?, ?)", [(ts, k, c) for k, c in items.items()])
         self.db.commit()
+
+    def _update_snapshot(self, table: str, ts: float, items: dict[str, int]) -> None:
+        t = self._snapshot_table(table)
+        with self.db:
+            self.db.execute(f"DELETE FROM {t} WHERE ts = (SELECT MAX(ts) FROM {t})")
+            self.db.executemany(f"INSERT OR REPLACE INTO {t} VALUES (?, ?, ?)", [(ts, k, c) for k, c in items.items()])
+
+    def _latest_snapshot(self, table: str) -> tuple[float | None, dict[str, int]]:
+        t = self._snapshot_table(table)
+        ts = self.db.execute(f"SELECT MAX(ts) FROM {t}").fetchone()[0]
+        if ts is None:
+            return None, {}
+        return ts, dict(self.db.execute(f"SELECT item_key, count FROM {t} WHERE ts = ?", (ts,)).fetchall())
+
+    def set_inventory(self, ts: float, items: dict[str, int]) -> None:
+        self._set_snapshot("inventory", ts, items)
 
     def update_inventory(self, ts: float, items: dict[str, int]) -> None:
         """Replace the newest snapshot with ``items`` at ``ts``; older logins stay."""
-        with self.db:
-            self.db.execute("DELETE FROM inventory WHERE ts = (SELECT MAX(ts) FROM inventory)")
-            self.db.executemany("INSERT OR REPLACE INTO inventory VALUES (?, ?, ?)",
-                                [(ts, k, c) for k, c in items.items()])
+        self._update_snapshot("inventory", ts, items)
 
     def latest_inventory(self) -> tuple[float | None, dict[str, int]]:
-        ts = self.db.execute("SELECT MAX(ts) FROM inventory").fetchone()[0]
-        if ts is None:
-            return None, {}
-        return ts, dict(self.db.execute("SELECT item_key, count FROM inventory WHERE ts = ?", (ts,)).fetchall())
+        return self._latest_snapshot("inventory")
+
+    def set_warehouse(self, ts: float, items: dict[str, int]) -> None:
+        self._set_snapshot("warehouse", ts, items)
+
+    def update_warehouse(self, ts: float, items: dict[str, int]) -> None:
+        """Replace the newest warehouse snapshot with ``items`` at ``ts``; older logins stay."""
+        self._update_snapshot("warehouse", ts, items)
+
+    def latest_warehouse(self) -> tuple[float | None, dict[str, int]]:
+        return self._latest_snapshot("warehouse")
 
     @overload
     def get_meta(self, key: str) -> str | None: ...

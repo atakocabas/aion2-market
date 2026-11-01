@@ -57,6 +57,10 @@ setLocale(state.lang);
 let dealsData = { items: [], rules: {} };
 let craftData = { chains: [], best_sales: [] };
 let invData = { items: [], unpriced: [] };
+const INV_PLACES = ["bag", "warehouse", "all"];
+const invPlace = () => INV_PLACES.includes(state.invPlace) ? state.invPlace : "bag";
+// Bag, warehouse or both on the inventory page; the favorites page always counts the bag.
+const invPlaceQs = () => state.view === "inv" ? "&place=" + invPlace() : "";
 delete state.listed;                     // replaced by hideEmpty (0-listing items now sit at the bottom)
 let data = { items: [] }, selected = null;
 

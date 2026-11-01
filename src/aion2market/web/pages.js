@@ -138,7 +138,8 @@ function renderMorphs(list) {
 const SIGNAL_LABEL = { sell: "Sat", hold: "Bekle", normal: "Normal", check: "Kontrol et" };
 
 function renderInventory() {
-  const sig = state.invSignal || "";
+  const sig = state.invSignal || "", place = invPlace();
+  document.querySelectorAll("#invPlace button").forEach(b => b.classList.toggle("on", b.dataset.g === place));
   document.querySelectorAll("#invSignal button").forEach(b => b.classList.toggle("on", b.dataset.g === sig));
   const rows = invTable.sort(invData.items.filter(r => passesCommon(r) && (!sig || r.signal === sig)));
   invTable.renderHead();
@@ -172,8 +173,8 @@ function renderInventory() {
   }).join("");
   const empty = document.getElementById("invEmpty");
   empty.hidden = rows.length > 0;
-  empty.textContent = t(!invData.ts ? "Envanter henüz yok. Oyuna giriş yaptığında kendiliğinden gelir."
-    : "Filtrelere uyan item yok.");
+  empty.textContent = t(place === "warehouse" && !invData.warehouse_ts ? "Depo henüz yok. Bir sonraki oyuna girişte dolar."
+    : !invData.ts ? "Envanter henüz yok. Oyuna giriş yaptığında kendiliğinden gelir." : "Filtrelere uyan item yok.");
   const up = invData.unpriced || [];
   const invFoot = document.getElementById("invFoot");
   invFoot.innerHTML = help(invFoot, "Öneriler nasıl hesaplanıyor?",

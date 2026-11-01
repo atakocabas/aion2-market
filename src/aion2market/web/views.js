@@ -208,7 +208,7 @@ async function refresh() {
     data = await r.json();
     if (state.view === "deals") dealsData = await (await fetch(`/api/deals${qs}`, { cache: "no-store" })).json();
     if (state.view === "craft") craftData = await (await fetch(`/api/crafting${qs}`, { cache: "no-store" })).json();
-    if (state.view === "inv" || state.view === "fav") invData =await (await fetch(`/api/inventory${qs}`, { cache: "no-store" })).json();
+    if (state.view === "inv" || state.view === "fav") invData =await (await fetch(`/api/inventory${qs}${invPlaceQs()}`, { cache: "no-store" })).json();
     fillCategories();
     document.getElementById("status").textContent = t("Güncellendi {0}", new Date().toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     render();

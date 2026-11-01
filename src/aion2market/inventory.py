@@ -5,7 +5,7 @@ At login the server sends opcode 0x5611: every stack the character owns as recor
 Records differ in length by item type, so instead of walking them we look for
 known market item keys and validate each hit: the two bytes before the key are
 zero and the count is sensible. Bytes that only look like a key fail that.
-Container 1 is the bag; 15 warehouse, 11 equipped, 4 transient pickups, others unknown.
+Container 1 is the bag (stored), 15 the warehouse (stored separately), 11 equipped, 4 transient pickups, others unknown.
 
 During play 0x561b lists changed stacks: u8 n, then n records of
     u8 op (0 add, 1 update, 2 remove) | u8 ext | the same id/key/count/container/slot | tail
@@ -36,6 +36,7 @@ PENDING_SECONDS = 15.0                 # keep packets of not-yet-identified conn
 
 CHANGE_OPCODE = 0x561b
 CONTAINER_INVENTORY = 1
+CONTAINER_WAREHOUSE = 15
 CONTAINER_TRANSIENT = 4                # picked up and used ~0.1 s later
 ADD, UPDATE, REMOVE = 0, 1, 2
 
@@ -194,14 +195,18 @@ class GameTracker:
             conn.stacks = parse_login(payload, self._known())
             items = totals(conn.stacks)
             self.store.set_inventory(ts, items)
+            self.store.set_warehouse(ts, totals(conn.stacks, CONTAINER_WAREHOUSE))
             return [f"Envanter kaydedildi: {len(items)} çeşit item, toplam {sum(items.values())} adet"]
         if opcode == CHANGE_OPCODE and conn.stacks is not None:     # joined mid-session: no ids to apply to
             try:
                 changes = parse_changes(payload)
             except ValueError:
                 return []
+            warehouse = totals(conn.stacks, CONTAINER_WAREHOUSE)
             if apply_changes(conn.stacks, changes, self._known()):
                 self.store.update_inventory(ts, totals(conn.stacks))   # silent: loot would flood the log
+            if totals(conn.stacks, CONTAINER_WAREHOUSE) != warehouse:
+                self.store.update_warehouse(ts, totals(conn.stacks, CONTAINER_WAREHOUSE))
         return []
 
     def _known(self) -> set[int]:
@@ -211,7 +216,7 @@ class GameTracker:
 
 
 def import_run(store: Store, run: Path) -> tuple[float, dict[str, int]] | None:
-    """Store the last inventory found in a capture folder (as written by aion2market.capture)."""
+    """Store the last inventory (bag and warehouse) found in a capture folder (as written by aion2market.capture)."""
     from .report import load_frames
     found = None
     for t, _, f in load_frames(run):
@@ -219,8 +224,10 @@ def import_run(store: Store, run: Path) -> tuple[float, dict[str, int]] | None:
             found = (t, f.payload)
     if found is None:
         return None
-    items = parse_inventory(found[1], known_keys(store))
+    stacks = parse_login(found[1], known_keys(store))
+    items = totals(stacks)
     store.set_inventory(found[0], items)
+    store.set_warehouse(found[0], totals(stacks, CONTAINER_WAREHOUSE))
     return found[0], items
 
 

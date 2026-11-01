@@ -25,6 +25,9 @@ document.getElementById("invRows").onclick = rowClick;
 document.getElementById("favRows").onclick = rowClick;
 document.querySelectorAll("#favKind button").forEach(b => b.onclick = () => { state.favKind = b.dataset.g; save(); render(); });
 document.querySelectorAll("#invSignal button").forEach(b => b.onclick = () => { state.invSignal = b.dataset.g; save(); render(); });
+document.querySelectorAll("#invPlace button").forEach(b => b.onclick = () => {
+  if (state.invPlace !== b.dataset.g) { state.invPlace = b.dataset.g; save(); render(); refresh(); }
+});
 document.getElementById("craftView").onclick = e => { const tr = e.target.closest("tr[data-key]"); if (tr) openItem(tr.dataset.key); };
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { if (state.view !== b.dataset.view) setView(b.dataset.view); });
 const bind = (id, key, get) => { const el = document.getElementById(id); el.addEventListener("input", () => { state[key] = get(el); save(); render(); }); };

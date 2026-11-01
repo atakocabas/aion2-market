@@ -119,6 +119,8 @@ const EN = {
   "fiyatlar en yüksek; en düşük {0} (fark {1})": "highest prices; lowest on {0} (spread {1})",
   "{0}'den listele": "list at {0}",
   "Envanter henüz yok. Oyuna giriş yaptığında kendiliğinden gelir.": "No inventory yet. It arrives by itself when you log in to the game.",
+  "Çanta": "Bag", "Depo": "Warehouse",
+  "Depo henüz yok. Bir sonraki oyuna girişte dolar.": "No warehouse yet. It fills in at your next login to the game.",
   '"Sat": fiyat 7 gün ortalamasının en az %10 üstünde ya da 7 günde en az %15 yükselmiş. "Bekle": 7 gün ortalamasının en az %10 altında. ':
     '"Sell": the price is at least 10% over its 7-day average or rose at least 15% in 7 days. "Wait": at least 10% under its 7-day average. ',
   "Önerilen fiyat, en ucuz ilanın 1 altı (en ucuz ilan uydurmaysa 7 gün ortalaması). Market kesintisi {0}. ":

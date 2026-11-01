@@ -387,9 +387,29 @@ SELL_RISE = 15.0        # ... or up at least 15 % over 7 days
 HOLD_DISCOUNT = 0.10    # "wait": at least 10 % under that average
 
 
-def inventory_view(store: Store, server_id: int | None = None, lang: str = "tr") -> dict:
-    """The latest inventory priced at this server's current market, with a sell/wait signal per item."""
-    ts, owned = store.latest_inventory()
+INVENTORY_PLACES = ("bag", "warehouse", "all")
+
+
+def inventory_place(value: str) -> str:
+    """A requested inventory place, or "bag" for anything else."""
+    return value if value in INVENTORY_PLACES else "bag"
+
+
+def inventory_view(store: Store, server_id: int | None = None, lang: str = "tr", place: str = "bag") -> dict:
+    """The latest bag, warehouse or both (summed per item) priced at this server's current market,
+    with a sell/wait signal per item."""
+    place = inventory_place(place)
+    bag_ts, bag = store.latest_inventory()
+    wh_ts, warehouse = store.latest_warehouse()
+    if place == "bag":
+        ts, owned = bag_ts, bag
+    elif place == "warehouse":
+        ts, owned = wh_ts, warehouse
+    else:
+        ts = max((t for t in (bag_ts, wh_ts) if t is not None), default=None)
+        owned = dict(bag)
+        for key, count in warehouse.items():
+            owned[key] = owned.get(key, 0) + count
     sid = server_id or default_server(store)
     series = load_series(store, sid)
     rows = {r["item_key"]: r for r in item_rows(store, server_id=sid, series=series)["items"]}
@@ -422,7 +442,8 @@ def inventory_view(store: Store, server_id: int | None = None, lang: str = "tr")
                       # undercut the cheapest listing by one, unless that listing is bogus
                       "suggest_price": max(1, round(sell_price) - (0 if bogus else 1)),
                       "value_net": round(count * sell_price * (1 - fee / 100))})
-    return {"ts": ts, "fee_pct": fee, "server_id": sid, "weekdays": pattern, "items": items,
+    return {"ts": ts, "place": place, "bag_ts": bag_ts, "warehouse_ts": wh_ts,
+            "fee_pct": fee, "server_id": sid, "weekdays": pattern, "items": items,
             "unpriced": sorted(unpriced, key=lambda u: -(u["count"])),
             "total_value": sum(i["value_net"] for i in items),
             "sell_value": sum(i["value_net"] for i in items if i["signal"] == "sell")}
@@ -594,7 +615,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/settings":
                 return self._json({"exclude": get_exclude(store)})
             if path == "/api/inventory":
-                return self._json(inventory_view(store, server_id, lang))
+                place = inventory_place(params.get("place", [""])[0])
+                return self._json(inventory_view(store, server_id, lang, place))
             if path == "/api/crafting":
                 return self._json(crafting_view(store, server_id, lang))
             if path == "/api/servers":
