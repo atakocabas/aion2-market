@@ -134,6 +134,8 @@ const EN = {
   " (fiyat yok)": " (no price)", "Odyle'dan dönüştürmek daha ucuz": "Cheaper to morph from Odyle", "Marketten": "From the market",
   "{0} deneme": "{0} attempts", " (normal sonuç)": " (normal result)", "Al": "Buy", "Üret": "Craft",
   "En ucuz yol: {0}": "Cheapest route: {0}",
+  "≈ işaretli üretim maliyeti ve kârı beklenen deneme sayısına göre hesaplanır; şansa bağlı olduğu için gerçek sonuç sapabilir.":
+    "Crafting costs and profits marked ≈ are based on the expected number of attempts; since crafting is luck-based, the real result can differ.",
   // price changes page
   "Senin verdiğin ad": "Name you gave",
   "Son 30 günün fiyatlarının çok üstünde (7 gün ort. {0}); büyük ihtimalle tek bir uydurma ilan. Değişim gösterilmiyor.":

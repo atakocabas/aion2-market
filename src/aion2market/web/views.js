@@ -1,13 +1,16 @@
 "use strict";
 /* ---------- crafting page ---------- */
 const money = v => v == null ? `<span class="na">–</span>` : fmt(v);
-const profitCell = v => v == null ? `<span class="na">–</span>`
-  : `<span class="profit ${v > 0 ? "pos" : "neg"}">${v > 0 ? "+" : ""}${fmt(v)}</span>`;
+/* Chain costs and profits rest on expected attempts (luck-based), so they are shown as estimates with "≈". */
+const approx = v => v == null ? money(v) : `≈${fmt(v)}`;
+const profitCell = (v, est) => v == null ? `<span class="na">–</span>`
+  : `<span class="profit ${v > 0 ? "pos" : "neg"}">${est ? "≈" : ""}${v > 0 ? "+" : ""}${fmt(v)}</span>`;
 
 function renderCraft() {
   const fee = craftData.fee_pct ?? 12;
   const craftIntro = document.getElementById("craftIntro");
   craftIntro.innerHTML = t("Her kademe için en ucuz yol: marketten <b>al</b> ya da bir önceki kademenin en ucuz yolundan <b>üret</b>.") +
+    `<span class="save">${t("≈ işaretli üretim maliyeti ve kârı beklenen deneme sayısına göre hesaplanır; şansa bağlı olduğu için gerçek sonuç sapabilir.")}</span>` +
     help(craftIntro, "Nasıl hesaplanıyor?", t("Üretim maliyeti = bir denemenin malzemesi × beklenen deneme sayısı (her adımda %25 kombo ihtimali; 4. adımın normal sonucu ~1,06 denemede). " +
       "Malzeme en ucuz yoldan hesaplanır: marketten, Odyle'dan dönüştürerek (mor) ya da kendi tarifinden üreterek (yeşil). " +
       "NPC'den alınan (Bound) malzemelerin fiyatı bilinmediğinden maliyete katılmaz (+NPC). Kâr, market kesintisi ({0}) düşüldükten sonra. " +
@@ -26,8 +29,8 @@ function renderCraft() {
   document.getElementById("craftBest").innerHTML = best.length
     ? best.slice(0, 12).map(x => `<tr data-key="${x.item_key}">
         <td class="l">${named(x)}</td><td class="muted">${x.step ? t("{0} · {1}. adım", x.slot, x.step) : esc(x.slot)}</td>
-        <td>${money(x.craft_cost)}${npcMark(x)}</td><td class="price">${money(x.market_price)}</td>
-        <td>${profitCell(x.sell_profit)}<span class="save">${pct(x.profit_pct)}</span></td></tr>`).join("")
+        <td>${x.step ? approx(x.craft_cost) : money(x.craft_cost)}${npcMark(x)}</td><td class="price">${money(x.market_price)}</td>
+        <td>${profitCell(x.sell_profit, !!x.step)}<span class="save">${pct(x.profit_pct)}</span></td></tr>`).join("")
     : `<tr><td colspan="5" class="empty">${t("Şu an üretip satınca kâr eden kademe yok.")}</td></tr>`;
   const crafted = m => m.via === "craft" || m.via === "craft_npc";
   const matLine = m => m.price == null
@@ -47,13 +50,13 @@ function renderCraft() {
       <td class="rank">${normal ? "" : st.step}</td>
       <td class="l">${named(x)}${normal ? "" : `<div class="mats">${st.materials.map(matLine).join("")}</div>`}</td>
       <td>${money(x.attempt_cost)}<span class="save">× ${t("{0} deneme", PF.format(x.tries))}${normal ? t(" (normal sonuç)") : ""}</span></td>
-      <td>${money(x.craft_cost)}</td><td class="price">${money(x.market_price)}</td>
-      <td>${x.best ? `<span class="badge ${x.best}">${t(x.best === "buy" ? "Al" : "Üret")}</span> ${money(x.cost)}` : `<span class="na">–</span>`}</td>
-      <td>${profitCell(x.sell_profit)}</td></tr>`;
+      <td>${approx(x.craft_cost)}</td><td class="price">${money(x.market_price)}</td>
+      <td>${x.best ? `<span class="badge ${x.best}">${t(x.best === "buy" ? "Al" : "Üret")}</span> ${x.best === "buy" ? money(x.cost) : approx(x.cost)}` : `<span class="na">–</span>`}</td>
+      <td>${profitCell(x.sell_profit, true)}</td></tr>`;
   const lastProfit = c => { const st = c.steps[c.steps.length - 1]; return [st.result, st.normal_result].map(x => x && x.sell_profit).filter(v => v != null); };
   document.getElementById("craftChains").innerHTML = craftData.chains.filter(inProf).map(c => `<details class="chain"${(state.craftOpen || {})[c.slot] ? " open" : ""} data-slot="${esc(c.slot)}">
       <summary><div class="ch"><h2>${esc(c.slot)}</h2><span class="muted">${esc(c.profession)}</span><span class="route">${t("En ucuz yol: {0}", esc(c.route))}</span>
-        ${lastProfit(c).length ? `<span class="muted">${t("son adım üret-sat: {0}", lastProfit(c).map(v => (v > 0 ? "+" : "") + fmt(v)).join(" / "))}</span>` : ""}${npcMark(c)}</div></summary>
+        ${lastProfit(c).length ? `<span class="muted">${t("son adım üret-sat: {0}", lastProfit(c).map(v => "≈" + (v > 0 ? "+" : "") + fmt(v)).join(" / "))}</span>` : ""}${npcMark(c)}</div></summary>
       <div class="tablebox"><table class="deals">
         <thead><tr><th>${t("Adım")}</th><th class="l">${t("Sonuç ve bir denemenin malzemesi")}</th><th>${t("Bir deneme")}</th>
           <th title="${t("Önceki kademenin en ucuz yolu + bu adımın beklenen malzemesi")}">${t("Üretim maliyeti")}</th><th>${t("Market fiyatı")}</th>
