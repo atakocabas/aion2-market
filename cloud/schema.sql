@@ -1,9 +1,11 @@
 -- Shared Aion 2 market price store (Cloudflare D1).
 -- Apply with: npx wrangler d1 execute aion2-market --remote --file=schema.sql
--- A database made before self-registration also needs migrate-001.sql (once).
+-- A database made before self-registration also needs migrate-001.sql (once), and one made before
+-- the second-key rule and the snapshot counter needs migrate-002.sql (once).
 
 -- Uploaders: invited by the owner (auto = 0) or registered by the app itself (auto = 1).
--- Only a SHA-256 of each key is stored. window_* count rows uploaded in the current hour.
+-- Only a SHA-256 of each key is stored. window_* count rows uploaded in the current hour;
+-- snapshots counts the snapshots this key added (for the admin list).
 CREATE TABLE IF NOT EXISTS contributors (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     name         TEXT NOT NULL,
@@ -13,7 +15,8 @@ CREATE TABLE IF NOT EXISTS contributors (
     last_seen_ts REAL,
     auto         INTEGER NOT NULL DEFAULT 0,
     window_start REAL NOT NULL DEFAULT 0,
-    window_rows  INTEGER NOT NULL DEFAULT 0
+    window_rows  INTEGER NOT NULL DEFAULT 0,
+    snapshots    INTEGER NOT NULL DEFAULT 0
 );
 
 -- Self-registrations per day and caller, for the registration limit. The caller is a salted
@@ -25,13 +28,16 @@ CREATE TABLE IF NOT EXISTS registrations (
     PRIMARY KEY (day, caller)
 );
 
--- Typical price per item, a slow average of accepted uploads. Uploads far from it are rejected.
+-- Typical price per item, a slow average of accepted uploads. Uploads far from it are rejected, but only
+-- once a key other than first_contributor has sent prices for the item (multi = 1).
 CREATE TABLE IF NOT EXISTS item_ref (
-    server_id  INTEGER NOT NULL,
-    item_key   TEXT NOT NULL,
-    ref_price  REAL NOT NULL,
-    samples    INTEGER NOT NULL,
-    updated_ts REAL NOT NULL,
+    server_id         INTEGER NOT NULL,
+    item_key          TEXT NOT NULL,
+    ref_price         REAL NOT NULL,
+    samples           INTEGER NOT NULL,
+    updated_ts        REAL NOT NULL,
+    first_contributor INTEGER,
+    multi             INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (server_id, item_key)
 );
 

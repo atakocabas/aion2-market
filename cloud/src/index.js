@@ -30,6 +30,7 @@ const REF_MIN_SAMPLES = 3;              // until an item has this many accepted 
 const REF_WEIGHT = 0.2;                 // how fast the typical price follows accepted prices (in log space)
 const REF_UPDATE_SECONDS = 600;         // the typical price is updated at most this often per item
 const REF_STALE_SECONDS = 3 * 86400;    // with no accepted price for this long it starts over (real price jumps)
+const LAST_SEEN_SECONDS = 600;          // "last seen" is rough, so a sync every minute isn't a write every minute
 
 export default {
   async fetch(request, env) {
@@ -66,10 +67,14 @@ function bearer(request) {
 async function contributor(request, env) {
   const key = bearer(request);
   if (!key) throw new HttpError(401, "missing key");
-  const row = await env.DB.prepare("SELECT id, name, active, window_start, window_rows FROM contributors WHERE key_hash = ?")
+  const row = await env.DB.prepare(
+    "SELECT id, name, active, window_start, window_rows, last_seen_ts FROM contributors WHERE key_hash = ?")
     .bind(await sha256(key)).first();
   if (!row || !row.active) throw new HttpError(401, "invalid key");
-  await env.DB.prepare("UPDATE contributors SET last_seen_ts = ? WHERE id = ?").bind(Date.now() / 1000, row.id).run();
+  const now = Date.now() / 1000;
+  if (!row.last_seen_ts || now - row.last_seen_ts >= LAST_SEEN_SECONDS) {
+    await env.DB.prepare("UPDATE contributors SET last_seen_ts = ? WHERE id = ?").bind(now, row.id).run();
+  }
   return row;
 }
 
@@ -172,23 +177,24 @@ async function register(request, env) {
   return json({ id: res.meta.last_row_id, key });            // the only time the key is shown
 }
 
-// Rows per key and hour; throws 429 when this upload would go over.
-async function takeQuota(env, who, rows, now) {
+// Rows per key and hour: throws 429 when this upload would go over, else the window to record after it.
+function checkQuota(who, rows, now) {
   const fresh = now - who.window_start >= 3600;
   const used = fresh ? 0 : who.window_rows;
   if (used + rows > ROWS_PER_HOUR) throw new HttpError(429, `at most ${ROWS_PER_HOUR} rows per hour`);
-  await env.DB.prepare("UPDATE contributors SET window_start = ?, window_rows = ? WHERE id = ?")
-    .bind(fresh ? now : who.window_start, used + rows, who.id).run();
+  return { start: fresh ? now : who.window_start, rows: used + rows };
 }
 
 // Drops snapshots far from the item's typical price and moves the typical price toward the rest.
-async function screenSnapshots(env, snaps, now) {
+// The typical price only rejects anything once a second key has sent prices for the item, so one key
+// can't seed a fake price that then blocks everyone else's real ones.
+async function screenSnapshots(env, snaps, now, who) {
   if (!snaps.length) return [snaps, 0];
   const items = [...new Map(snaps.map(r => [`${r[0]}|${r[1]}`, [r[0], r[1]]])).values()];
   const refs = new Map();
   for (let i = 0; i < items.length; i += CHUNK) {
     const { results } = await env.DB.prepare(
-      `SELECT r.server_id, r.item_key, r.ref_price, r.samples, r.updated_ts FROM item_ref r
+      `SELECT r.server_id, r.item_key, r.ref_price, r.samples, r.updated_ts, r.first_contributor, r.multi FROM item_ref r
        JOIN json_each(?1) j ON r.server_id = json_extract(j.value, '$[0]') AND r.item_key = json_extract(j.value, '$[1]')`)
       .bind(JSON.stringify(items.slice(i, i + CHUNK))).all();
     for (const r of results) if (now - r.updated_ts < REF_STALE_SECONDS) refs.set(`${r.server_id}|${r.item_key}`, r);
@@ -196,26 +202,36 @@ async function screenSnapshots(env, snaps, now) {
   const ok = [], latest = new Map();
   for (const r of snaps) {
     const id = `${r[0]}|${r[1]}`, ref = refs.get(id);
-    if (ref && ref.samples >= REF_MIN_SAMPLES &&
+    if (ref && ref.multi && ref.samples >= REF_MIN_SAMPLES &&
         (r[3] > ref.ref_price * OUTLIER_FACTOR || r[3] < ref.ref_price / OUTLIER_FACTOR)) continue;
     ok.push(r);
     if (!latest.has(id) || latest.get(id)[2] < r[2]) latest.set(id, r);
   }
+  // [server_id, item_key, ref_price, samples, first_contributor, multi, updated_ts]
   const updates = [];
   for (const [id, r] of latest) {
     const ref = refs.get(id);
-    if (!ref) updates.push([r[0], r[1], r[3], 1]);
-    else if (now - ref.updated_ts >= REF_UPDATE_SECONDS) {
+    if (!ref) {
+      updates.push([r[0], r[1], r[3], 1, who.id, 0, now]);
+      continue;
+    }
+    const first = ref.first_contributor ?? who.id;
+    const multi = ref.multi || first !== who.id ? 1 : 0;
+    if (now - ref.updated_ts >= REF_UPDATE_SECONDS) {
       const price = Math.exp((1 - REF_WEIGHT) * Math.log(ref.ref_price) + REF_WEIGHT * Math.log(r[3]));
-      updates.push([r[0], r[1], price, ref.samples + 1]);
+      updates.push([r[0], r[1], price, ref.samples + 1, first, multi, now]);
+    } else if (multi !== ref.multi || ref.first_contributor == null) {
+      updates.push([r[0], r[1], ref.ref_price, ref.samples, first, multi, ref.updated_ts]);
     }
   }
   await insertChunks(env,
-    `INSERT INTO item_ref (server_id, item_key, ref_price, samples, updated_ts)
-     SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]'), json_extract(value, '$[3]'), ?2
+    `INSERT INTO item_ref (server_id, item_key, ref_price, samples, first_contributor, multi, updated_ts)
+     SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]'),
+            json_extract(value, '$[3]'), json_extract(value, '$[4]'), json_extract(value, '$[5]'), json_extract(value, '$[6]')
      FROM json_each(?1) WHERE true
      ON CONFLICT(server_id, item_key) DO UPDATE SET
-       ref_price = excluded.ref_price, samples = excluded.samples, updated_ts = excluded.updated_ts`, updates, [now]);
+       ref_price = excluded.ref_price, samples = excluded.samples, first_contributor = excluded.first_contributor,
+       multi = excluded.multi, updated_ts = excluded.updated_ts`, updates, []);
   return [ok, snaps.length - ok.length];
 }
 
@@ -226,8 +242,8 @@ async function upload(request, env) {
   const [cleanSnaps, badSnaps] = cleanSnapshots(data.snapshots, now);
   const [lists, badLists] = cleanListings(data.listings, now);
   const [items, badItems] = cleanItems(data.items);
-  await takeQuota(env, who, cleanSnaps.length + lists.length + items.length, now);
-  const [snaps, outliers] = await screenSnapshots(env, cleanSnaps, now);
+  const quota = checkQuota(who, cleanSnaps.length + lists.length + items.length, now);
+  const [snaps, outliers] = await screenSnapshots(env, cleanSnaps, now, who);
   const snapInserted = await insertChunks(env,
     `INSERT OR IGNORE INTO snapshots (server_id, item_key, ts, min_unit_price, sale_count, contributor_id, received_ts)
      SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]'),
@@ -247,6 +263,8 @@ async function upload(request, env) {
             json_extract(value, '$[3]'), json_extract(value, '$[4]'), json_extract(value, '$[5]'),
             json_extract(value, '$[6]'), ?2, ?3
      FROM json_each(?1)`, items, [who.id, now]);
+  await env.DB.prepare("UPDATE contributors SET window_start = ?, window_rows = ?, snapshots = snapshots + ? WHERE id = ?")
+    .bind(quota.start, quota.rows, snapInserted, who.id).run();
   return json({ snapshots: { inserted: snapInserted, rejected: badSnaps, outliers },
                 listings: { inserted: listInserted, rejected: badLists },
                 items: { inserted: itemInserted, rejected: badItems } });
@@ -274,9 +292,7 @@ async function admin(request, env, path) {
   const now = Date.now() / 1000;
   if (path === "/v1/admin/keys" && request.method === "GET") {
     const { results } = await env.DB.prepare(
-      `SELECT c.id, c.name, c.active, c.auto, c.created_ts, c.last_seen_ts,
-              (SELECT COUNT(*) FROM snapshots s WHERE s.contributor_id = c.id) AS snapshots
-       FROM contributors c ORDER BY c.id`).all();
+      "SELECT id, name, active, auto, created_ts, last_seen_ts, snapshots FROM contributors ORDER BY id").all();
     return json({ contributors: results });
   }
   const data = await body(request);
@@ -298,6 +314,7 @@ async function admin(request, env, path) {
       env.DB.prepare("DELETE FROM snapshots WHERE contributor_id = ?").bind(id),
       env.DB.prepare("DELETE FROM listings WHERE contributor_id = ?").bind(id),
       env.DB.prepare("DELETE FROM item_info WHERE contributor_id = ?").bind(id),
+      env.DB.prepare("UPDATE contributors SET snapshots = 0 WHERE id = ?").bind(id),
     ]);
     return json({ snapshots: a.meta.changes, listings: b.meta.changes, items: c.meta.changes });
   }

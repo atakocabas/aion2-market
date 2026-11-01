@@ -31,7 +31,7 @@ npx wrangler deploy
 - `deploy` komutu adresi yazar, ör. `https://aion2-market.<hesabın>.workers.dev`.
 - Bu adresi [sync.py](../src/aion2market/sync.py) içindeki `DEFAULT_URL` değerine yaz. Uygulama (ve ondan derlenen exe) bu adresi kullanır.
 
-Bu sürümden önce oluşturulmuş bir veritabanı varsa bir kez `--file=migrate-001.sql`, sonra yine `--file=schema.sql` çalıştır.
+Bu sürümden önce oluşturulmuş bir veritabanı varsa bir kez `--file=migrate-001.sql`, sonra yine `--file=schema.sql` çalıştır. "İkinci anahtar" kuralından önce oluşturulmuş bir veritabanında ise yeni worker'ı `deploy` etmeden önce bir kez `--file=migrate-002.sql` çalıştır.
 
 ## Kullanıcılar nasıl katılır
 
@@ -41,7 +41,7 @@ Kayıt sınırları: aynı adresten günde en fazla 3, toplamda günde en fazla 
 
 ## Bozuk fiyat koruması
 
-- Her item için depo, kabul edilen fiyatlardan yavaş değişen bir "normal fiyat" tutar. Bir item'ın en az 3 kabul edilmiş fiyatı olduktan sonra, normal fiyatın 10 katından fazla ya da 10'da birinden az olan fiyatlar reddedilir. Yükleme cevabında `outliers` olarak sayılır.
+- Her item için depo, kabul edilen fiyatlardan yavaş değişen bir "normal fiyat" tutar. Bir item'ın en az 3 kabul edilmiş fiyatı olduktan ve ilk gönderenden başka bir anahtar da o item için fiyat gönderdikten sonra, normal fiyatın 10 katından fazla ya da 10'da birinden az olan fiyatlar reddedilir. Yükleme cevabında `outliers` olarak sayılır. İkinci anahtar şartı, tek bir anahtarın yeni bir item'a uydurma fiyat verip herkesin gerçek fiyatlarını engellemesini önler.
 - Gerçek fiyat 10 kattan fazla değişirse: 3 gün boyunca hiç fiyat kabul edilmeyen item'ın normal fiyatı sıfırlanır ve yeniden öğrenilir.
 - Bir anahtar saatte en fazla 20.000 satır (fiyat + ilan) yükleyebilir. Bir market açılışı yaklaşık 600 satırdır.
 - Bunlara rağmen bozuk veri gelirse: her satır kimin yüklediğiyle birlikte saklanır, aşağıdaki `revoke` ve `purge` ile o anahtar kapatılıp yüklediği her şey silinir.
