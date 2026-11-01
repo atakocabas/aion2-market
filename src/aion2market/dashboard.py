@@ -573,6 +573,11 @@ class Handler(BaseHTTPRequestHandler):
             html = resources.files("aion2market").joinpath("web/index.html").read_bytes()
             html = html.replace(b"__VERSION__", __version__.encode())
             return self._send(200, html, "text/html; charset=utf-8")
+        # Static assets: a fixed allowlist, so no request path ever reaches the file system.
+        if path[1:] in ("app.css", "i18n.js", "core.js", "pages.js", "views.js", "detail.js", "main.js"):
+            body = resources.files("aion2market").joinpath("web" + path).read_bytes()
+            ctype = "text/css" if path.endswith(".css") else "text/javascript"
+            return self._send(200, body, ctype + "; charset=utf-8")
         with _open() as store:
             if path == "/api/items":
                 return self._json(item_rows(store, server_id=server_id))

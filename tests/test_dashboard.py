@@ -203,6 +203,24 @@ def test_http_api(server):
     assert detail["name"] == "Pure Odyle" and detail["watch"] == {"target": 55000}
 
 
+def test_static_assets_are_served_from_an_allowlist(server):
+    port, _ = server
+    _, html = _req(port, "GET", "/")
+    assets = {"app.css": "text/css", "i18n.js": "text/javascript", "core.js": "text/javascript",
+              "pages.js": "text/javascript", "views.js": "text/javascript", "detail.js": "text/javascript",
+              "main.js": "text/javascript"}
+    for name, ctype in assets.items():
+        assert f'"{name}?v={dashboard.__version__}"'.encode() in html
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        c.request("GET", f"/{name}?v=1")
+        r = c.getresponse()
+        assert r.status == 200 and r.getheader("Content-Type") == ctype + "; charset=utf-8"
+        assert r.getheader("Cache-Control") == "no-store" and r.read()
+    for bad in ("/../store.py", "/%2e%2e/store.py", "/..%2fstore.py", "/web/app.css", "/icon.ico", "/x.js"):
+        assert _req(port, "GET", bad)[0] in (403, 404)
+    assert _req(port, "GET", "/app.css", headers={"Host": "evil.example:8765"})[0] == 403
+
+
 def test_hide_settings_are_validated_and_persisted(server):
     port, path = server
     j = {"Content-Type": "application/json"}
