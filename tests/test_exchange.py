@@ -8,6 +8,7 @@ import pytest
 from aion2market import dashboard, exchange, recipes, sync
 from aion2market.store import Store
 
+
 @pytest.fixture(autouse=True)
 def no_recipe_keys(monkeypatch):
     """These tests count requests/rows for the items they create; crafting items are tested elsewhere."""

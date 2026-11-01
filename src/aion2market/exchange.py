@@ -27,8 +27,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from datetime import datetime
-from typing import Callable
 
 from . import alerts
 from .store import Store

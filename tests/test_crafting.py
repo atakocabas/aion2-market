@@ -1,5 +1,3 @@
-import pytest
-
 from aion2market import crafting, exchange, recipes
 from aion2market.store import Store
 

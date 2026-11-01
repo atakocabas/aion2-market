@@ -144,9 +144,10 @@ def dress_window(window, show_event=None) -> None:
     Runs as pywebview's before_show handler, i.e. on the WinForms UI thread with window.native
     (the Form) already built, so the WinForms calls below need no Invoke."""
     import ctypes
+
     from System import Action, EventHandler
     from System.Drawing import Icon
-    from System.Windows import Forms as WinForms             # pythonnet, already loaded by pywebview
+    from System.Windows import Forms as WinForms  # pythonnet, already loaded by pywebview
 
     form = window.native
     hwnd = form.Handle.ToInt32()

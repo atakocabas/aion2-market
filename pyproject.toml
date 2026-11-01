@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "ruff", "mypy"]
 app = ["pywebview>=5", "pyinstaller>=6"]
 
 [build-system]
@@ -32,3 +32,25 @@ aion2market = ["web/*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",  # ~300 deliberate long lines (aligned trailing comments, inline data); wrapping them is pure churn
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests name captured log lines `l` in short comprehensions and build tiny fixture rows with a lambda.
+"tests/*" = ["E741", "E731"]
+
+[tool.mypy]
+files = ["src/aion2market/store.py", "src/aion2market/dashboard.py"]
+mypy_path = "src"
+ignore_missing_imports = true
+# Use the rest of the package for types, but report errors only in the files listed above.
+follow_imports = "silent"

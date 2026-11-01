@@ -72,6 +72,7 @@ def test_share_client_turns_protocol_errors_into_share_errors(monkeypatch):
 
 def test_market_interfaces_adds_the_route_to_the_market(monkeypatch):
     import socket
+
     from aion2market import capture
     monkeypatch.setattr(socket, "gethostbyname", lambda h: "1.2.3.4")
     monkeypatch.setattr(capture, "_route_iface", lambda ip: "VPN")

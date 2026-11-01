@@ -92,7 +92,7 @@ def last_scan(series: dict[str, list[tuple]], now: float) -> float | None:
     recent = [(p[0], key) for key, s in series.items() for p in s if p[0] >= now - 30 * DAY]
     need = max(1, math.ceil(len({key for _, key in recent}) * SCAN_SHARE))
     recent.sort(reverse=True)
-    window, newest = Counter(), 0
+    window, newest = Counter[str](), 0
     for ts, key in recent:
         window[key] += 1
         while recent[newest][0] - ts > SESSION_GAP:
@@ -363,7 +363,7 @@ def deals(rows: list[dict], fee_pct: float = 12.0, lang: str = "tr") -> list[dic
             warnings.append(text(lang, "sliding"))
         warning = " · ".join(warnings) or None
         # One short line for the table: only what its columns don't already show.
-        note = []
+        note: list[dict] = []
         if r["prev"]["change"] is not None and r["prev"]["change"] <= DEAL_MIN_DROP:
             note.append({"text": text(lang, "note_drop", p=-r["prev"]["change"])})
         if position <= 0.15:
@@ -511,7 +511,7 @@ def clean_exclude(data) -> dict:
 
 def get_exclude(store: Store) -> dict:
     try:
-        return clean_exclude(json.loads(store.get_meta(EXCLUDE_KEY, "{}")))
+        return clean_exclude(json.loads(store.get_meta(EXCLUDE_KEY) or "{}"))
     except ValueError:
         return clean_exclude({})
 

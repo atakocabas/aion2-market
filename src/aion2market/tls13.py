@@ -128,7 +128,7 @@ class Direction:
         if self._cipher is None and not self._load():
             return None
         while True:
-            nonce = bytes(a ^ b for a, b in zip(self._iv, self.seq.to_bytes(12, "big")))
+            nonce = bytes(a ^ b for a, b in zip(self._iv, self.seq.to_bytes(12, "big"), strict=True))
             try:
                 plain = self._cipher.decrypt(nonce, body, header)
             except InvalidTag:

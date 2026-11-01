@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.find:
         for n in args.find:
             for name, pat in value_patterns(n).items():
-                for t, conn, f in frames:
+                for t, _conn, f in frames:
                     i = f.payload.find(pat)
                     while i != -1:
                         ctx = f.payload[max(0, i - 24):i + len(pat) + 24]

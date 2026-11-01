@@ -16,7 +16,6 @@ from dataclasses import dataclass
 
 from .store import Store
 
-
 FAVORITE_DEAL_DISCOUNT = 0.20     # favorites without a target alert at 20 % under their 7-day average
 
 
