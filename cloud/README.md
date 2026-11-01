@@ -89,3 +89,13 @@ npx wrangler dev --local --port 8787
 ```
 
 Bu durumda adres `http://127.0.0.1:8787` olur; uygulamayı `AION2_SHARE_URL=http://127.0.0.1:8787` ile çalıştır.
+
+## Test
+
+```bash
+cd cloud
+npm ci
+npm test
+```
+
+Node 22 veya üstü gerekir. Testler worker'ı wrangler'ın test aracıyla bellekteki bir D1 üzerinde çalıştırır; Cloudflare hesabı, giriş ya da uzak veritabanı gerekmez, diske de bir şey kalmaz. [test/schema-d3ba669.sql](test/schema-d3ba669.sql) `migrate-002.sql` öncesi şemadır, o göç bununla denenir.
