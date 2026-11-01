@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import hmac
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -25,7 +26,7 @@ from .http1 import http_messages
 HANDSHAKE, APPLICATION_DATA, CHANGE_CIPHER_SPEC = 22, 23, 20
 
 # cipher suite -> (aead, key length, hash)
-SUITES = {
+SUITES: dict[int, tuple[type[AESGCM | ChaCha20Poly1305], int, Callable]] = {
     0x1301: (AESGCM, 16, hashlib.sha256),
     0x1302: (AESGCM, 32, hashlib.sha384),
     0x1303: (ChaCha20Poly1305, 32, hashlib.sha256),
@@ -111,7 +112,7 @@ class Direction:
     suite: int
     stage: int = 0
     seq: int = 0
-    _cipher: object = field(default=None, repr=False)
+    _cipher: AESGCM | ChaCha20Poly1305 | None = field(default=None, repr=False)
     _iv: bytes = b""
 
     def _load(self) -> bool:
@@ -128,6 +129,7 @@ class Direction:
         if self._cipher is None and not self._load():
             return None
         while True:
+            assert self._cipher is not None             # _load() returned True
             nonce = bytes(a ^ b for a, b in zip(self._iv, self.seq.to_bytes(12, "big"), strict=True))
             try:
                 plain = self._cipher.decrypt(nonce, body, header)
@@ -214,6 +216,7 @@ class TlsConnection:
         """Decrypt whatever is pending; returns (direction, application data) chunks."""
         if self.dirs is None and not self._load_keys():
             return []
+        assert self.dirs is not None                    # _load_keys() returned True
         out = []
         for d in ("c2s", "s2c"):
             data = bytearray()

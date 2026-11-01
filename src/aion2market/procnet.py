@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 
 import psutil
@@ -39,7 +40,7 @@ def _is_loopback(ip: str) -> bool:
     return ip.startswith("127.") or ip == "::1"
 
 
-def game_connections(pids: set[int], exclude_ports: set[int] = frozenset()) -> set[ConnKey]:
+def game_connections(pids: set[int], exclude_ports: AbstractSet[int] = frozenset()) -> set[ConnKey]:
     """Established TCP connections owned by the given pids.
 
     Loopback connections are kept because tunnelling tools (ExitLag, etc.)

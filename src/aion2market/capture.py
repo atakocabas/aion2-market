@@ -26,7 +26,7 @@ from collections import Counter, deque
 from datetime import datetime
 from pathlib import Path
 
-from scapy.all import IP, TCP, AsyncSniffer, IPv6, PcapWriter, Raw, conf
+from scapy.all import IP, TCP, AsyncSniffer, IPv6, PcapWriter, Raw, conf  # type: ignore[attr-defined]  # scapy.all re-exports layers dynamically
 
 from .procnet import DEFAULT_PROCESS_PATTERN, ConnKey, find_game_pids, game_connections
 from .reassembly import Data, Gap, StreamReassembler
@@ -141,7 +141,7 @@ class Session:
 
     def _replay_unknown(self) -> None:
         cutoff = time.time() - UNKNOWN_BUFFER_SECONDS
-        keep = deque(maxlen=UNKNOWN_BUFFER_MAX)
+        keep: deque[dict] = deque(maxlen=UNKNOWN_BUFFER_MAX)
         for p in self.unknown:
             key, direction = self._match(p)
             if key is not None:

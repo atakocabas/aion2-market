@@ -274,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
                 import webview
                 window = webview.create_window(APP_NAME, url, width=1400, height=900, min_size=(900, 600),
                                                background_color=TITLE_BG)
+                assert window is not None     # None only for windows created after webview.start()
                 if sys.platform == "win32":
                     window.events.before_show += functools.partial(dress_window, show_event=show_event)
                 webview.start(icon=str(ICON))

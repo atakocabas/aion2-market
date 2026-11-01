@@ -82,15 +82,21 @@ class StreamReassembler:
             self._skip_gap(out)
         return out
 
+    def _expected(self) -> int:
+        """next_seq; feed() sets it before any of the helpers below run."""
+        assert self.next_seq is not None
+        return self.next_seq
+
     def _emit(self, payload: bytes, out: list[Event]) -> None:
         out.append(Data(self.offset, payload))
         self.offset += len(payload)
-        self.next_seq = (self.next_seq + len(payload)) % MOD
+        self.next_seq = (self._expected() + len(payload)) % MOD
 
     def _drain(self, out: list[Event]) -> None:
         while self._pending:
-            k = min(self._pending, key=lambda s: seq_diff(s, self.next_seq))
-            d = seq_diff(k, self.next_seq)
+            nxt = self._expected()
+            k = min(self._pending, key=lambda s: seq_diff(s, nxt))
+            d = seq_diff(k, nxt)
             if d > 0:
                 return
             data = self._pending.pop(k)
@@ -99,8 +105,9 @@ class StreamReassembler:
                 self._emit(data[-d:], out)
 
     def _skip_gap(self, out: list[Event]) -> None:
-        k = min(self._pending, key=lambda s: seq_diff(s, self.next_seq))
-        gap = seq_diff(k, self.next_seq)
+        nxt = self._expected()
+        k = min(self._pending, key=lambda s: seq_diff(s, nxt))
+        gap = seq_diff(k, nxt)
         if gap > 0:
             out.append(Gap(self.offset, gap))
             self.offset += gap

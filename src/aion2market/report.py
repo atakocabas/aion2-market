@@ -95,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.opcode:
         wanted = {int(o, 16) for o in args.opcode}
-        shown = defaultdict(int)
+        shown: defaultdict[int, int] = defaultdict(int)
         for t, conn, f in frames:
             if f.opcode in wanted and shown[f.opcode] < args.samples:
                 shown[f.opcode] += 1

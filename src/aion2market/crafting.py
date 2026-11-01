@@ -37,7 +37,9 @@ def material_cost(key: str, prices: dict[str, dict], name: str = "", _seen: froz
 
 def recipe_cost(recipe: dict, prices: dict[str, dict], _seen: frozenset = frozenset()) -> tuple[float | None, list[dict], bool]:
     """(material cost of one craft, material lines, whether NPC materials were left out)."""
-    lines, total, npc = [], 0.0, False
+    lines: list[dict] = []
+    total: float | None = 0.0
+    npc = False
     for key, name, qty in recipe["materials"]:
         mc = material_cost(key, prices, name, _seen)
         lines.append({"item_key": key, "name": name, "qty": qty, **(mc or {"price": None, "via": None})})
@@ -76,7 +78,7 @@ def detect_race(prices: dict[str, dict]) -> str | None:
     for chain in CHAINS:
         for step in chain["steps"]:
             seen[chain["race"]] += step["output"][0] in prices
-    return max(seen, key=seen.get) if any(seen.values()) else None
+    return max(seen, key=seen.__getitem__) if any(seen.values()) else None
 
 
 def plan(prices: dict[str, dict], fee_pct: float = 12.0, lang: str = "tr", race: str | None = None) -> list[dict]:
