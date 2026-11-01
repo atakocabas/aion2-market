@@ -318,9 +318,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "setup":
             try:
                 if args.key:
-                    client = ShareClient(args.url, args.key)
-                    client.request("GET", "/v1/servers")
-                    store.set_meta("sync.url", client.url)
+                    invited = ShareClient(args.url, args.key)
+                    invited.request("GET", "/v1/servers")
+                    store.set_meta("sync.url", invited.url)
                     store.set_meta("sync.key", args.key)
                 else:
                     register(store, args.url)

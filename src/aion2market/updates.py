@@ -9,6 +9,7 @@ import json
 import threading
 import time
 import urllib.request
+from typing import Any
 
 from . import __version__
 
@@ -18,7 +19,7 @@ RETRY_AFTER = 30 * 60      # after a failed check
 TIMEOUT = 10
 
 _lock = threading.Lock()
-_state = {"next_check": 0.0, "checking": False, "latest": None, "url": None}
+_state: dict[str, Any] = {"next_check": 0.0, "checking": False, "latest": None, "url": None}
 
 
 def parse(version: str | None) -> tuple[int, ...] | None:

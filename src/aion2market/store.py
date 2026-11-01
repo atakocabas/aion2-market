@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import overload
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS items (
@@ -220,6 +221,13 @@ class Store:
         if ts is None:
             return None, {}
         return ts, dict(self.db.execute("SELECT item_key, count FROM inventory WHERE ts = ?", (ts,)).fetchall())
+
+    @overload
+    def get_meta(self, key: str) -> str | None: ...
+    @overload
+    def get_meta(self, key: str, default: str) -> str: ...
+    @overload
+    def get_meta(self, key: str, default: None) -> str | None: ...
 
     def get_meta(self, key: str, default: str | None = None) -> str | None:
         row = self.db.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
