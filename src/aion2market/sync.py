@@ -18,6 +18,7 @@ window or with `disable`.
 
     # store owner only
     python -m aion2market.sync admin --url ... --admin-token ... create-key "Ali"
+    python -m aion2market.sync admin --url ... --admin-token ... stats    # key counts and daily activity
 """
 from __future__ import annotations
 
@@ -268,6 +269,19 @@ def sync_once(store: Store, client: ShareClient, notifier=None, now: float | Non
     return lines + shared_alerts(store, new_snaps, notifier, now)
 
 
+def _print_stats(r: dict) -> None:
+    k, seen = r["keys"], r["seen"]
+    print(f"Anahtar: {k['total']} toplam, {k['active']} aktif, {k['uploading']} fiyat gönderen")
+    print(f"Görülen: son 24 saat {seen['day']}, son 7 gün {seen['week']}, son 30 gün {seen['month']}")
+    days = list(r["daily"])
+    while days and not days[0]["active"] and not days[0]["new"]:
+        days.pop(0)                                    # skip the empty stretch before the first activity
+    print("Gün          Aktif  Yeni")
+    for d in days:
+        print(f"{d['day']:<10} {d['active']:>6} {d['new']:>5}")
+    print("Not: bir kişinin birden çok anahtarı olabilir (yeniden kurulum, ikinci PC).")
+
+
 def _admin(args) -> int:
     c = ShareClient(args.url, args.admin_token)
     if args.action == "create-key":
@@ -278,6 +292,8 @@ def _admin(args) -> int:
             seen = time.strftime("%Y-%m-%d %H:%M", time.localtime(k["last_seen_ts"])) if k["last_seen_ts"] else "-"
             print(f"#{k['id']:<3} {'aktif' if k['active'] else 'iptal':<6} {k['name']:<20} "
                   f"{k['snapshots']:>8} fiyat  son görülme {seen}")
+    elif args.action == "stats":
+        _print_stats(c.request("GET", "/v1/admin/stats"))
     elif args.action == "revoke":
         print(c.request("POST", "/v1/admin/keys/revoke", {"id": int(args.rest[0])}))
     elif args.action == "purge":
@@ -303,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("admin", help="depo sahibi: anahtar ve sunucu yönetimi")
     p.add_argument("--url", required=True)
     p.add_argument("--admin-token", required=True)
-    p.add_argument("action", choices=["create-key", "list", "revoke", "purge", "server-name"])
+    p.add_argument("action", choices=["create-key", "list", "stats", "revoke", "purge", "server-name"])
     p.add_argument("rest", nargs="*")
     args = ap.parse_args(argv)
 

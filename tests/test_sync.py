@@ -187,3 +187,29 @@ def test_store_without_item_endpoint_still_shares_prices():
     lines = sync.sync_once(a, cloud.client("ka"), now=NOW)
     assert len(cloud.snapshots) == 1 and a.get_meta("sync.last_error") is None
     assert any("Item adları eşitlenemedi" in l for l in lines)
+
+
+def test_admin_stats_prints_summary_and_skips_leading_zero_days(monkeypatch, capsys):
+    stats = {"keys": {"total": 5, "active": 4, "uploading": 3},
+             "seen": {"day": 1, "week": 4, "month": 5},
+             "daily": [{"day": "2026-10-28", "active": 0, "new": 0},
+                       {"day": "2026-10-29", "active": 0, "new": 0},
+                       {"day": "2026-10-30", "active": 3, "new": 5},
+                       {"day": "2026-10-31", "active": 0, "new": 0},
+                       {"day": "2026-11-01", "active": 2, "new": 1}]}
+    calls = []
+
+    class C(sync.ShareClient):
+        def request(self, method, path, body=None):
+            calls.append((method, path))
+            return stats
+
+    monkeypatch.setattr(sync, "ShareClient", C)
+    assert sync.main(["admin", "--url", "https://fake", "--admin-token", "t", "stats"]) == 0
+    out = capsys.readouterr().out
+    assert calls == [("GET", "/v1/admin/stats")]
+    assert "Anahtar: 5 toplam, 4 aktif, 3 fiyat gönderen" in out
+    assert "Görülen: son 24 saat 1, son 7 gün 4, son 30 gün 5" in out
+    assert "2026-10-28" not in out and "2026-10-29" not in out
+    assert "2026-10-30" in out and "2026-10-31" in out and "2026-11-01" in out
+    assert out.rstrip().endswith("Not: bir kişinin birden çok anahtarı olabilir (yeniden kurulum, ikinci PC).")
