@@ -45,3 +45,12 @@ test("the worker runs on the migrated database", async () => {
   const first = await w.db.prepare("SELECT first_contributor FROM item_ref WHERE item_key = '100000001'").first();
   assert.equal(first.first_contributor, k.body.id);           // filled in by the first upload after the migration
 });
+
+test("migrate-003 creates the activity table and can run twice", async () => {
+  await exec(w.db, sql("migrate-003.sql"));
+  await exec(w.db, sql("migrate-003.sql"));
+  assert.deepEqual(await columns("activity"), ["day", "contributor_id"]);
+  const s = await w.api("/v1/admin/stats", { key: ADMIN_TOKEN });
+  assert.equal(s.status, 200);
+  assert.equal(s.body.daily.length, 30);
+});

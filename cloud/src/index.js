@@ -8,6 +8,7 @@
 //   GET  /v1/items?since=<seq>      (contributor key)  official item names/grades/icons
 //   GET  /v1/servers                (contributor key)  server names
 //   /v1/admin/...                   (ADMIN_TOKEN)      keys, server names, purge
+//   GET  /v1/admin/stats            (ADMIN_TOKEN)      key counts, last seen day/week/month, daily active/new
 //
 // Keys are sent as "Authorization: Bearer <key>"; only their SHA-256 is stored.
 
@@ -30,6 +31,8 @@ const REF_MIN_SAMPLES = 3;              // until an item has this many accepted 
 const REF_WEIGHT = 0.2;                 // how fast the typical price follows accepted prices (in log space)
 const REF_UPDATE_SECONDS = 600;         // the typical price is updated at most this often per item
 const REF_STALE_SECONDS = 3 * 86400;    // with no accepted price for this long it starts over (real price jumps)
+const ACTIVITY_DAYS = 400;              // activity rows older than this are deleted (on registration)
+const STATS_DAYS = 30;
 const LAST_SEEN_SECONDS = 600;          // "last seen" is rough, so a sync every minute isn't a write every minute
 
 export default {
@@ -59,6 +62,8 @@ async function sha256(text) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+const utcDay = ts => new Date(ts * 1000).toISOString().slice(0, 10);
+
 function bearer(request) {
   const h = request.headers.get("Authorization") || "";
   return h.startsWith("Bearer ") ? h.slice(7).trim() : "";
@@ -72,8 +77,12 @@ async function contributor(request, env) {
     .bind(await sha256(key)).first();
   if (!row || !row.active) throw new HttpError(401, "invalid key");
   const now = Date.now() / 1000;
-  if (!row.last_seen_ts || now - row.last_seen_ts >= LAST_SEEN_SECONDS) {
-    await env.DB.prepare("UPDATE contributors SET last_seen_ts = ? WHERE id = ?").bind(now, row.id).run();
+  const today = utcDay(now);
+  if (!row.last_seen_ts || now - row.last_seen_ts >= LAST_SEEN_SECONDS || utcDay(row.last_seen_ts) !== today) {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE contributors SET last_seen_ts = ? WHERE id = ?").bind(now, row.id),
+      env.DB.prepare("INSERT OR IGNORE INTO activity VALUES (?, ?)").bind(today, row.id),   // first request of the UTC day
+    ]);
   }
   return row;
 }
@@ -160,6 +169,7 @@ async function register(request, env) {
   const day = new Date().toISOString().slice(0, 10);
   const caller = await sha256(`${request.headers.get("CF-Connecting-IP") || "local"}|${env.ADMIN_TOKEN}`);
   await env.DB.prepare("DELETE FROM registrations WHERE day < ?").bind(day).run();
+  await env.DB.prepare("DELETE FROM activity WHERE day < ?").bind(utcDay(now - ACTIVITY_DAYS * 86400)).run();
   const [mine, all] = await env.DB.batch([
     env.DB.prepare("SELECT count FROM registrations WHERE day = ? AND caller = ?").bind(day, caller),
     env.DB.prepare("SELECT COALESCE(SUM(count), 0) AS n FROM registrations WHERE day = ?").bind(day),
@@ -287,6 +297,22 @@ async function download(request, env, table) {
   return json({ rows, next: rows.length ? rows[rows.length - 1][0] : since, more });
 }
 
+// Counts are keys, not people: one person may hold several (reinstall, second PC).
+async function stats(env, now) {
+  const days = Array.from({ length: STATS_DAYS }, (_, i) => utcDay(now - (STATS_DAYS - 1 - i) * 86400));
+  const [k, seen, act, created] = await env.DB.batch([
+    env.DB.prepare("SELECT COUNT(*) AS total, COALESCE(SUM(active = 1), 0) AS active, COALESCE(SUM(snapshots > 0), 0) AS uploading FROM contributors"),
+    env.DB.prepare(`SELECT COALESCE(SUM(last_seen_ts >= ?1 - 86400), 0) AS day, COALESCE(SUM(last_seen_ts >= ?1 - 7 * 86400), 0) AS week,
+                    COALESCE(SUM(last_seen_ts >= ?1 - 30 * 86400), 0) AS month FROM contributors`).bind(now),
+    env.DB.prepare("SELECT day, COUNT(*) AS n FROM activity WHERE day >= ? GROUP BY day").bind(days[0]),
+    env.DB.prepare("SELECT strftime('%Y-%m-%d', created_ts, 'unixepoch') AS day, COUNT(*) AS n FROM contributors WHERE created_ts >= ? GROUP BY day")
+      .bind(now - STATS_DAYS * 86400 - 86400),
+  ]);
+  const by = r => new Map(r.results.map(x => [x.day, x.n]));
+  const [a, c] = [by(act), by(created)];
+  return { keys: k.results[0], seen: seen.results[0], daily: days.map(day => ({ day, active: a.get(day) || 0, new: c.get(day) || 0 })) };
+}
+
 async function admin(request, env, path) {
   await requireAdmin(request, env);
   const now = Date.now() / 1000;
@@ -295,6 +321,7 @@ async function admin(request, env, path) {
       "SELECT id, name, active, auto, created_ts, last_seen_ts, snapshots FROM contributors ORDER BY id").all();
     return json({ contributors: results });
   }
+  if (path === "/v1/admin/stats" && request.method === "GET") return json(await stats(env, now));
   const data = await body(request);
   if (path === "/v1/admin/keys" && request.method === "POST") {
     const name = String(data.name || "").trim().slice(0, 60);

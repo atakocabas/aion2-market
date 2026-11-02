@@ -31,7 +31,7 @@ npx wrangler deploy
 - `deploy` komutu adresi yazar, ör. `https://aion2-market.<hesabın>.workers.dev`.
 - Bu adresi [sync.py](../src/aion2market/sync.py) içindeki `DEFAULT_URL` değerine yaz. Uygulama (ve ondan derlenen exe) bu adresi kullanır.
 
-Bu sürümden önce oluşturulmuş bir veritabanı varsa bir kez `--file=migrate-001.sql`, sonra yine `--file=schema.sql` çalıştır. "İkinci anahtar" kuralından önce oluşturulmuş bir veritabanında ise yeni worker'ı `deploy` etmeden önce bir kez `--file=migrate-002.sql` çalıştır.
+Bu sürümden önce oluşturulmuş bir veritabanı varsa bir kez `--file=migrate-001.sql`, sonra yine `--file=schema.sql` çalıştır. "İkinci anahtar" kuralından önce oluşturulmuş bir veritabanında ise yeni worker'ı `deploy` etmeden önce bir kez `--file=migrate-002.sql` çalıştır. Kullanım istatistiğinden (`admin ... stats`) önce oluşturulmuş bir veritabanında da yeni worker'ı `deploy` etmeden önce bir kez `--file=migrate-003.sql` çalıştır (tekrar çalıştırmak zararsızdır).
 
 ## Kullanıcılar nasıl katılır
 
@@ -51,10 +51,13 @@ Kayıt sınırları: aynı adresten günde en fazla 3, toplamda günde en fazla 
 ```bash
 .venv\Scripts\python -m aion2market.sync admin --url <adres> --admin-token <token> list                # anahtarlar, yükledikleri, son görülme
 ... admin --url <adres> --admin-token <token> create-key "Ali"    # elle anahtar (kayıt kapalıyken)
+... admin --url <adres> --admin-token <token> stats               # kaç anahtar, son gün/hafta/ay aktif olanlar, günlük tablo
 ... admin --url <adres> --admin-token <token> revoke 3            # anahtarı iptal et
 ... admin --url <adres> --admin-token <token> purge 3             # o anahtarın yüklediği her şeyi sil
 ... admin --url <adres> --admin-token <token> server-name 12306 "Sunucu adı"
 ```
+
+`stats` sayıları anahtar sayısıdır, kişi sayısı değil: aynı kişinin birden çok anahtarı olabilir (yeniden kurulum, ikinci bilgisayar). Günlük tablo için her anahtarın o gün (UTC) yaptığı ilk istek kaydedilir; IP ya da başka bir şey tutulmaz.
 
 ## Komut satırından (geliştirici)
 

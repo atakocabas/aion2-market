@@ -1,7 +1,8 @@
 -- Shared Aion 2 market price store (Cloudflare D1).
 -- Apply with: npx wrangler d1 execute aion2-market --remote --file=schema.sql
 -- A database made before self-registration also needs migrate-001.sql (once), and one made before
--- the second-key rule and the snapshot counter needs migrate-002.sql (once).
+-- the second-key rule and the snapshot counter needs migrate-002.sql (once), and one made before
+-- the usage statistics needs migrate-003.sql (once).
 
 -- Uploaders: invited by the owner (auto = 0) or registered by the app itself (auto = 1).
 -- Only a SHA-256 of each key is stored. window_* count rows uploaded in the current hour;
@@ -26,6 +27,14 @@ CREATE TABLE IF NOT EXISTS registrations (
     caller  TEXT NOT NULL,
     count   INTEGER NOT NULL,
     PRIMARY KEY (day, caller)
+);
+
+-- One row per key per UTC day it made any authenticated request (for the admin stats). Only keys are
+-- stored, no IPs; rows older than 400 days are deleted.
+CREATE TABLE IF NOT EXISTS activity (
+    day            TEXT NOT NULL,
+    contributor_id INTEGER NOT NULL,
+    PRIMARY KEY (day, contributor_id)
 );
 
 -- Typical price per item, a slow average of accepted uploads. Uploads far from it are rejected, but only

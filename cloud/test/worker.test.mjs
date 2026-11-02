@@ -265,3 +265,34 @@ test("last_seen_ts is written at most every 10 minutes", async () => {
   await w.api("/v1/servers", { key });
   assert.ok((await contributor(id)).last_seen_ts >= first);
 });
+
+test("admin stats needs the token", async () => {
+  const { key } = await newKey();
+  assert.equal((await w.api("/v1/admin/stats")).status, 401);
+  assert.equal((await w.api("/v1/admin/stats", { key })).status, 401);
+  assert.equal((await w.api("/v1/admin/stats", { key: ADMIN_TOKEN })).status, 200);
+});
+
+test("admin stats counts keys, uploads and today's activity once", async () => {
+  const stats = async () => (await w.api("/v1/admin/stats", { key: ADMIN_TOKEN })).body;
+  const before = await stats();
+  const today = new Date().toISOString().slice(0, 10);
+  assert.equal(before.daily.length, 30);
+  assert.equal(before.daily.at(-1).day, today);
+  assert.ok(before.daily.every(d => /^\d{4}-\d\d-\d\d$/.test(d.day) && d.active >= 0 && d.new >= 0));
+
+  const a = await newKey(), b = await newKey();
+  await upload(a.key, { snapshots: [snap(server(), "100000777", now() - 60, 10)] });
+  for (let i = 0; i < 3; i++) await w.api("/v1/servers", { key: a.key });
+  await admin("/v1/admin/keys/revoke", { id: b.id });
+
+  const after = await stats();
+  assert.deepEqual(after.keys, { total: before.keys.total + 2, active: before.keys.active + 1, uploading: before.keys.uploading + 1 });
+  const seen = await w.db.prepare("SELECT COUNT(*) AS n FROM contributors WHERE last_seen_ts >= ?").bind(now() - 86400).first();
+  assert.equal(after.seen.day, seen.n);
+  assert.ok(after.seen.week >= after.seen.day && after.seen.month >= after.seen.week);
+  const row = await w.db.prepare("SELECT COUNT(*) AS n FROM activity WHERE day = ? AND contributor_id = ?").bind(today, a.id).first();
+  assert.equal(row.n, 1);
+  assert.equal(after.daily.at(-1).active, before.daily.at(-1).active + 1);
+  assert.equal(after.daily.at(-1).new, before.daily.at(-1).new + 2);
+});
