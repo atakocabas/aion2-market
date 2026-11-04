@@ -449,6 +449,115 @@ def inventory_view(store: Store, server_id: int | None = None, lang: str = "tr",
             "sell_value": sum(i["value_net"] for i in items if i["signal"] == "sell")}
 
 
+MY_SALES = "/trade/v1.0/me/sales"
+MY_SETTLED = "/trade/v1.0/me/earnings/changes"
+MY_PENDING = "/trade/v1.0/me/earnings"
+
+
+def _latest_body(store: Store, path: str) -> tuple[float | None, dict]:
+    """The newest successful response to ``path`` as a dict, or (None, {}) if there is none or it's unreadable."""
+    row = store.db.execute("SELECT ts, body FROM responses WHERE path = ? AND status = 200 "
+                           "ORDER BY ts DESC LIMIT 1", (path,)).fetchone()
+    if not row:
+        return None, {}
+    try:
+        body = json.loads(row[1])
+    except ValueError:
+        return row[0], {}
+    return row[0], body if isinstance(body, dict) else {}
+
+
+def _rows_of(body: dict, key: str) -> list[dict]:
+    rows = body.get(key)
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+
+
+def _epoch(iso) -> float | None:
+    """An ISO timestamp from the game API (e.g. "2026-11-07T15:29:29.281+09:00") as epoch seconds."""
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(iso)).timestamp()
+    except ValueError:
+        return None
+
+
+def my_sales_view(store: Store, server_id: int | None = None, lang: str = "tr") -> dict:
+    """The player's own market listings and settled sales from the newest /me responses, each set against
+    the item's current lowest price on this server."""
+    sid = server_id or default_server(store)
+    rows = {r["item_key"]: r for r in item_rows(store, server_id=sid)["items"]}
+    info = store.item_info()
+    fee = sell_fee_pct(store)
+
+    def item(key: str) -> dict:
+        r = rows.get(key)
+        official = info.get(key, {})
+        listed = bool(r and r["count"])
+        return {"item_key": key, "name": (r["name"] if r else None) or store.name(key),
+                "official_name": official.get("name"), "icon": official.get("icon"),
+                "grade_name": official.get("grade_name"), "category": official.get("category"),
+                "watched": bool(r and r["watched"]),
+                "lowest": r["price"] if r and listed else None, "lowest_ts": r["ts"] if r and listed else None,
+                "market_count": r["count"] if r else 0, "_suspect": r.get("suspect") if r else None}
+
+    listings_ts, body = _latest_body(store, MY_SALES)
+    listings = []
+    for s in _rows_of(body, "sales"):
+        try:
+            key = str(s["game_item_key"])
+            quantity, unit = int(s["game_item_quantity"]), float(s["unit_price"])
+            sale_price = int(float(s["sale_price"]))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+        if quantity <= 0 or not math.isfinite(unit):
+            continue
+        row = item(key)
+        lowest, suspect = row["lowest"], row.pop("_suspect")
+        status = "unknown" if lowest is None else "lowest" if unit <= lowest else "undercut"
+        listings.append({"sale_id": s.get("sale_id"), **row, "quantity": quantity, "unit_price": unit,
+                         "sale_price": sale_price, "expires": _epoch(s.get("effective_to")), "status": status,
+                         "gap_pct": round((unit - lowest) / lowest * 100, 1) if lowest else None,
+                         # undercut the cheapest listing by one, unless that listing is bogus
+                         "suggest_price": max(1, round(lowest) - 1)
+                         if status == "undercut" and lowest is not None and suspect != "high" else None})
+    order = {"undercut": 0, "lowest": 1, "unknown": 2}
+    listings.sort(key=lambda x: (order[x["status"]], -(x["gap_pct"] if x["gap_pct"] is not None else -math.inf)))
+    total = sum(x["sale_price"] for x in listings)
+    try:
+        net = int(float(body["total_estimated_earnings"]))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        net = round(total * (1 - fee / 100))
+
+    _, pending_body = _latest_body(store, MY_PENDING)
+    pending = {d.get("delivery_id") for d in _rows_of(pending_body, "deliveries")} - {None}
+    settled_ts, body = _latest_body(store, MY_SETTLED)
+    settled = []
+    for d in _rows_of(body, "deliveries"):
+        try:
+            key = str(d["game_item_key"])
+            quantity, sale_price = int(d["game_item_quantity"]), int(float(d["sale_price"]))
+            earnings = int(float(d["earnings"]))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+        if quantity <= 0:
+            continue
+        row = item(key)
+        row.pop("_suspect")
+        row.pop("official_name")
+        unit = sale_price / quantity
+        lowest = row["lowest"]
+        settled.append({"delivery_id": d.get("delivery_id"), **row, "quantity": quantity, "sale_price": sale_price,
+                        "unit_price": unit, "earnings": earnings, "sold": _epoch(d.get("registered")),
+                        "pending": d.get("delivery_id") in pending,
+                        "diff_pct": round((lowest - unit) / unit * 100, 1) if lowest is not None and unit else None})
+    settled.sort(key=lambda x: -(x["sold"] or 0))
+    return {"server_id": sid, "fee_pct": fee,
+            "listings_ts": listings_ts, "listings": listings, "listings_total": total, "listings_net": net,
+            "settled_ts": settled_ts, "settled": settled,
+            "settled_total": sum(x["earnings"] for x in settled),
+            "pending_total": sum(x["earnings"] for x in settled if x["pending"])}
+
+
 def crafting_view(store: Store, server_id: int | None = None, lang: str = "tr") -> dict:
     """Buy-or-craft for every chain and craft-and-sell for every single recipe, at this server's prices."""
     from .crafting import detect_race, plan, singles
@@ -617,6 +726,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/inventory":
                 place = inventory_place(params.get("place", [""])[0])
                 return self._json(inventory_view(store, server_id, lang, place))
+            if path == "/api/my-sales":
+                return self._json(my_sales_view(store, server_id, lang))
             if path == "/api/crafting":
                 return self._json(crafting_view(store, server_id, lang))
             if path == "/api/servers":
