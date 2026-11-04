@@ -69,7 +69,7 @@ function renderCraft() {
 }
 
 function setTitle() {
-  const page = { deals: "Fırsatlar", craft: "Üretim", inv: "Envanterim", fav: "Favoriler" }[state.view];
+  const page = { deals: "Fırsatlar", craft: "Üretim", inv: "Envanterim", sales: "Satışlarım", fav: "Favoriler" }[state.view];
   document.title = page ? `${t(page)} · Aion 2 Market` : "Aion 2 Market";
 }
 
@@ -90,8 +90,8 @@ function swapPageFilters(from, to) {
 function setView(v) {
   swapPageFilters(state.view, v);
   state.view = v; save();
-  const deals = v === "deals", craft = v === "craft", inv = v === "inv", fav = v === "fav";
-  const changes = !deals && !craft && !inv && !fav;
+  const deals = v === "deals", craft = v === "craft", inv = v === "inv", sales = v === "sales", fav = v === "fav";
+  const changes = !deals && !craft && !inv && !sales && !fav;
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   document.getElementById("changesView").hidden = !changes;
   document.getElementById("cards").hidden = !changes;
@@ -99,6 +99,7 @@ function setView(v) {
   document.getElementById("craftView").hidden = !craft;
   document.getElementById("dealsView").hidden = !deals;
   document.getElementById("invView").hidden = !inv;
+  document.getElementById("salesView").hidden = !sales;
   document.getElementById("favView").hidden = !fav;
   document.getElementById("favOnly").parentElement.hidden = fav;
   document.getElementById("period").hidden = !changes;
@@ -212,12 +213,24 @@ async function refresh() {
     if (state.view === "deals") dealsData = await (await fetch(`/api/deals${qs}`, { cache: "no-store" })).json();
     if (state.view === "craft") craftData = await (await fetch(`/api/crafting${qs}`, { cache: "no-store" })).json();
     if (state.view === "inv" || state.view === "fav") invData =await (await fetch(`/api/inventory${qs}${invPlaceQs()}`, { cache: "no-store" })).json();
+    if (state.view === "sales") salesData = await loadSales(qs);
     fillCategories();
     document.getElementById("status").textContent = t("Güncellendi {0}", new Date().toLocaleTimeString(LOC, { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     render();
     if (selected) openItem(selected, true);
   } catch (e) {
     document.getElementById("status").textContent = t("Sunucuya ulaşılamıyor");
+  }
+}
+
+// A failing sales endpoint only empties the sales page; the rest of the dashboard keeps updating.
+async function loadSales(qs) {
+  try {
+    const r = await fetch(`/api/my-sales${qs}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch {
+    return { ...NO_SALES, error: true };
   }
 }
 

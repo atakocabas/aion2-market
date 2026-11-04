@@ -24,6 +24,7 @@
       <button data-view="deals">Fırsatlar</button>
       <button data-view="craft">Üretim</button>
       <button data-view="inv">Envanterim</button>
+      <button data-view="sales">Satışlarım</button>
       <button data-view="fav">Favoriler</button>
     </nav>
     <div class="spacer"></div>
@@ -115,6 +116,32 @@
       <div class="empty" id="invEmpty" hidden></div>
     </div>
     <div class="foot" id="invFoot"></div>
+  </div>
+
+  <div id="salesView" hidden>
+    <section class="cards">
+      <div class="card"><div class="k">Satıştaki ilanlarım</div><div class="v" id="s-total">–</div><div class="s" id="s-total-s">&nbsp;</div></div>
+      <div class="card"><div class="k">Geçildiğin ilanlar</div><div class="v" id="s-under">–</div><div class="s" id="s-under-s">&nbsp;</div></div>
+      <div class="card"><div class="k">Satılanlar (hesap)</div><div class="v down" id="s-settled">–</div><div class="s" id="s-settled-s">&nbsp;</div></div>
+      <div class="card"><div class="k">Son güncelleme</div><div class="v" id="s-ts">–</div><div class="s" id="s-ts-s">&nbsp;</div></div>
+    </section>
+    <h3 class="sect" style="margin-top:4px">Satıştaki ilanlarım</h3>
+    <div class="tablebox">
+      <table class="deals">
+        <thead><tr id="salesHead"></tr></thead>
+        <tbody id="salesRows"></tbody>
+      </table>
+      <div class="empty" id="salesEmpty" hidden></div>
+    </div>
+    <h3 class="sect">Satılanlar (hesap)</h3>
+    <div class="tablebox">
+      <table class="deals">
+        <thead><tr id="settledHead"></tr></thead>
+        <tbody id="settledRows"></tbody>
+      </table>
+      <div class="empty" id="settledEmpty" hidden></div>
+    </div>
+    <div class="foot" id="salesFoot"></div>
   </div>
 
   <div id="favView" hidden>

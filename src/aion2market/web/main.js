@@ -22,6 +22,8 @@ const rowClick = e => {
 document.getElementById("rows").onclick = rowClick;
 document.getElementById("dealRows").onclick = rowClick;
 document.getElementById("invRows").onclick = rowClick;
+document.getElementById("salesRows").onclick = rowClick;
+document.getElementById("settledRows").onclick = rowClick;
 document.getElementById("favRows").onclick = rowClick;
 document.querySelectorAll("#favKind button").forEach(b => b.onclick = () => { state.favKind = b.dataset.g; save(); render(); });
 document.querySelectorAll("#invSignal button").forEach(b => b.onclick = () => { state.invSignal = b.dataset.g; save(); render(); });
@@ -73,6 +75,27 @@ const invTable = sortableTable("invHead", "invSort", [
   { id: "value", label: "Toplam (net)", title: "Adet × fiyat, market kesintisi düşülmüş", desc: true, sort: r => r.value_net },
   { id: "signal", label: "Öneri", cls: "l", sort: r => SIGNAL_RANK[r.signal] },
 ], "week");
+const SALE_RANK = { undercut: 0, unknown: 1, lowest: 2 };
+const salesTable = sortableTable("salesHead", "salesSort", [
+  { id: "star", label: "★", cls: "star", title: "Favoriler", sort: r => r.watched ? 0 : 1 },
+  { id: "name", label: "Item", cls: "l", sort: byName },
+  { id: "qty", label: "Adet", desc: true, sort: r => r.quantity },
+  { id: "unit", label: "Birim fiyatın", desc: true, sort: r => r.unit_price },
+  { id: "lowest", label: "En düşük fiyat", title: "Markette şu an en ucuz ilanın birim fiyatı (senin ilanın da olabilir)", desc: true, sort: r => r.lowest },
+  { id: "gap", label: "Fark", title: "Senin fiyatının en düşük fiyata göre farkı", desc: true, sort: r => r.gap_pct },
+  { id: "status", label: "Durum", cls: "l", sort: r => SALE_RANK[r.status] },
+  { id: "expires", label: "Bitiş", sort: r => r.expires },
+], "status");
+const settledTable = sortableTable("settledHead", "settledSort", [
+  { id: "star", label: "★", cls: "star", title: "Favoriler", sort: r => r.watched ? 0 : 1 },
+  { id: "name", label: "Item", cls: "l", sort: byName },
+  { id: "qty", label: "Adet", desc: true, sort: r => r.quantity },
+  { id: "unit", label: "Satış birim fiyatı", desc: true, sort: r => r.unit_price },
+  { id: "earnings", label: "Kazanç", title: "Market kesintisinden sonra eline geçen", desc: true, sort: r => r.earnings },
+  { id: "sold", label: "Satış zamanı", desc: true, sort: r => r.sold },
+  { id: "lowest", label: "Şu anki en düşük", desc: true, sort: r => r.lowest },
+  { id: "diff", label: "Fark", title: "Şu anki en düşük fiyatın senin sattığın fiyata göre farkı; artı: market şimdi daha pahalı", desc: true, sort: r => r.diff_pct },
+], "sold");
 const favTable = sortableTable("favHead", "favSort", [
   { id: "star", label: "★", cls: "star", title: "Favoriler", nosort: true },
   { id: "name", label: "Item", cls: "l", sort: byName },
@@ -154,5 +177,5 @@ document.querySelectorAll("#lang button").forEach(b => b.onclick = () => {
 });
 
 applyLang();
-setView(["deals", "craft", "inv", "fav"].includes(state.view) ? state.view : "changes");       // also does the first refresh
+setView(["deals", "craft", "inv", "sales", "fav"].includes(state.view) ? state.view : "changes");       // also does the first refresh
 setInterval(refresh, 30000);
