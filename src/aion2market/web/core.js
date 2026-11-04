@@ -57,6 +57,8 @@ setLocale(state.lang);
 let dealsData = { items: [], rules: {} };
 let craftData = { chains: [], best_sales: [] };
 let invData = { items: [], unpriced: [] };
+const NO_SALES = { listings: [], settled: [] };
+let salesData = NO_SALES;
 const INV_PLACES = ["bag", "warehouse", "all"];
 const invPlace = () => INV_PLACES.includes(state.invPlace) ? state.invPlace : "bag";
 // Bag, warehouse or both on the inventory page; the favorites page always counts the bag.

@@ -126,6 +126,34 @@ const EN = {
   "Önerilen fiyat, en ucuz ilanın 1 altı (en ucuz ilan uydurmaysa 7 gün ortalaması). Market kesintisi {0}. ":
     "The suggested price is 1 under the cheapest listing (the 7-day average if that listing is bogus). Market fee {0}. ",
   "Markette şu an ilanı olmayan {0} item listede yok: {1}.": "{0} items with no listings on the market right now aren't shown: {1}.",
+  // my sales
+  "Satışlarım": "My sales", "Satıştaki ilanlarım": "My active listings", "Geçildiğin ilanlar": "Undercut listings",
+  "Satılanlar (hesap)": "Sold (settlement)", "Son güncelleme": "Last updated", "Birim fiyatın": "Your unit price",
+  "En düşük fiyat": "Lowest price", "Fark": "Difference", "Bitiş": "Expires", "Satış birim fiyatı": "Sold unit price",
+  "Kazanç": "Earnings", "Satış zamanı": "Sold at", "Şu anki en düşük": "Current lowest",
+  "Markette şu an en ucuz ilanın birim fiyatı (senin ilanın da olabilir)": "Unit price of the cheapest listing on the market now (may be your own)",
+  "Senin fiyatının en düşük fiyata göre farkı": "Your price compared with the lowest price",
+  "Market kesintisinden sonra eline geçen": "What you receive after the market fee",
+  "Şu anki en düşük fiyatın senin sattığın fiyata göre farkı; artı: market şimdi daha pahalı":
+    "Current lowest price compared with what you sold at; plus: the market is higher now",
+  "En ucuz sensin": "You're the cheapest", "Geçildin": "Undercut", "{0}'den yeniden listele": "relist at {0}",
+  "Fiyat yok": "No price", "{0} ilan · {1}": "{0} listings · {1}",
+  "{0} ilan · kesinti sonrası {1}": "{0} listings · {1} after fee", "{0} ilanda en ucuz sensin": "cheapest on {0} listings",
+  "tahsil edilmeyen {0}": "{0} to collect", "hepsi tahsil edildi": "all collected",
+  "ilanlar {0} · hesap {1}": "listings {0} · settlement {1}", "toplam {0}": "total {0}", "süresi doldu": "expired",
+  "Tahsil edilmedi": "Not collected", "Satış verisi alınamadı.": "Couldn't load sales data.",
+  "Henüz ilan yok. Oyunda markette 'Satışlarım' sayfasını açınca gelir.":
+    "No listings yet. They arrive when you open the 'My sales' page of the market in game.",
+  "Filtrelere uyan ilan yok.": "No listings match the filters.", "Şu an satışta ilanın yok.": "You have no active listings right now.",
+  "Henüz satış kaydı yok. Oyunda markette 'Hesap' sayfasını açınca gelir.":
+    "No sales yet. They arrive when you open the 'Settlement' page of the market in game.",
+  "Filtrelere uyan satış yok.": "No sales match the filters.", "Hesapta satılmış item yok.": "No sold items in your settlement.",
+  "Bu sayfa hakkında": "About this page",
+  "İlanların ve satılanlar, oyunda markette 'Satışlarım' ve 'Hesap' sayfalarını açtığında güncellenir; aradaki değişiklikler o sayfaları tekrar açana kadar görünmez. ":
+    "Your listings and sales update when you open the market's 'My sales' and 'Settlement' pages in game; changes in between don't show until you open those pages again. ",
+  "En düşük fiyat, item'ın son market aramasındaki en ucuz ilanıdır ve senin kendi ilanın da olabilir; yanındaki süre o fiyatın ne kadar eski olduğunu gösterir. ":
+    "The lowest price is the cheapest listing from the item's last market search and may be your own listing; the time next to it shows how old that price is. ",
+  "Kazanç ve net toplam, market kesintisi ({0}) düşülmüş hâlidir.": "Earnings and the net total are after the market fee ({0}).",
   // crafting
   "Her kademe için en ucuz yol: marketten <b>al</b> ya da bir önceki kademenin en ucuz yolundan <b>üret</b>.":
     "The cheapest way to each tier: <b>buy</b> it on the market or <b>craft</b> it from the previous tier's cheapest route.",
