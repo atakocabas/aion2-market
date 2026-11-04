@@ -167,6 +167,71 @@ def test_policies_set_the_market_fee():
     assert sell_fee_pct(s) == 15.0 and handle_exchange(s, req, resp) == []
 
 
+def _sale(key, qty, unit, sale_id="S"):
+    return {"sale_id": sale_id, "game_server_id": "12306", "game_item_key": key, "game_item_quantity": str(qty),
+            "unit_price": f"{unit}.0000", "sale_price": str(unit * qty), "sale_status": "1",
+            "effective_to": "2026-11-07T15:29:29.281+09:00"}
+
+
+def _delivery(did, key, qty, price, earnings, registered="2026-11-04T10:00:00.000+09:00"):
+    return {"delivery_id": did, "game_server_id": "12306", "game_item_key": key, "game_item_quantity": str(qty),
+            "sale_price": str(price), "earnings": f"{earnings}.0000", "registered": registered}
+
+
+def _my_store():
+    import time as _t
+    now = _t.time()
+    s = Store(":memory:")
+    s.set_name("1", "Pure Odyle")
+    s.add_snapshots(now - 60, 12306, [("1", 60.0, 8), ("2", 100.0, 3)])
+    s.add_response(now - 30, dashboard.MY_SALES, "", 200, json.dumps({"sales": [
+        _sale("1", 2, 70, "A"),          # over the 60 lowest: undercut
+        _sale("2", 1, 100, "B"),         # at the lowest
+        _sale("9", 1, 5, "C"),           # no market price
+        {"sale_id": "D", "game_item_key": "1"},                      # malformed: skipped
+        _sale("1", 1, 80, "E")], "total_estimated_earnings": "300"}))
+    s.add_response(now - 20, dashboard.MY_SETTLED, "", 200, json.dumps({"deliveries": [
+        _delivery("X", "1", 2, 100, 88, "2026-11-03T10:00:00.000+09:00"),
+        _delivery("Y", "2", 1, 80, 70),
+        {"delivery_id": "Z", "earnings": "oops"}]}))
+    s.add_response(now - 10, dashboard.MY_PENDING, "", 200, json.dumps({"deliveries": [_delivery("Y", "2", 1, 80, 70)]}))
+    return s
+
+
+def test_my_sales_set_listings_against_the_lowest_price():
+    view = dashboard.my_sales_view(_my_store(), 12306)
+    by_id = {x["sale_id"]: x for x in view["listings"]}
+    assert [x["sale_id"] for x in view["listings"]] == ["E", "A", "B", "C"]
+    a, b, c = by_id["A"], by_id["B"], by_id["C"]
+    assert a["status"] == "undercut" and a["gap_pct"] == 16.7 and a["suggest_price"] == 59
+    assert a["name"] == "Pure Odyle" and a["quantity"] == 2 and a["sale_price"] == 140 and a["expires"]
+    assert b["status"] == "lowest" and b["gap_pct"] == 0 and b["suggest_price"] is None
+    assert c["status"] == "unknown" and c["lowest"] is None and c["market_count"] == 0
+    assert view["listings_total"] == 140 + 100 + 5 + 80 and view["listings_net"] == 300
+
+
+def test_my_sales_settled_marks_pending_and_compares_with_market():
+    view = dashboard.my_sales_view(_my_store(), 12306)
+    assert [x["delivery_id"] for x in view["settled"]] == ["Y", "X"]      # newest first, malformed skipped
+    y, x = view["settled"]
+    assert y["pending"] and not x["pending"]
+    assert x["unit_price"] == 50 and x["diff_pct"] == 20.0 and y["diff_pct"] == 25.0
+    assert view["settled_total"] == 158 and view["pending_total"] == 70
+
+
+def test_my_sales_without_responses_or_with_bad_bodies():
+    s = Store(":memory:")
+    view = dashboard.my_sales_view(s)
+    assert view["listings"] == [] and view["settled"] == [] and view["listings_ts"] is None
+    assert view["listings_total"] == view["listings_net"] == view["settled_total"] == view["pending_total"] == 0
+    s.add_response(1.0, dashboard.MY_SALES, "", 200, "not json")
+    s.add_response(1.0, dashboard.MY_SETTLED, "", 200, json.dumps({"deliveries": "nope"}))
+    s.add_response(2.0, dashboard.MY_PENDING, "", 500, "{}")
+    s.add_response(3.0, dashboard.MY_SALES, "", 401, json.dumps({"sales": [_sale("1", 1, 5)]}))  # errors ignored
+    view = dashboard.my_sales_view(s)
+    assert view["listings"] == [] and view["settled"] == [] and view["listings_ts"] == 1.0
+
+
 @pytest.fixture
 def server(tmp_path, monkeypatch):
     monkeypatch.setattr(updates, "status", lambda: {"available": False})   # no GitHub call from tests
@@ -201,6 +266,8 @@ def test_http_api(server):
                      {"Content-Type": "application/json"})
     detail = json.loads(_req(port, "GET", "/api/item/1")[1])
     assert detail["name"] == "Pure Odyle" and detail["watch"] == {"target": 55000}
+    status, body = _req(port, "GET", "/api/my-sales?server=12306&lang=en")
+    assert status == 200 and json.loads(body)["listings"] == []
 
 
 def test_static_assets_are_served_from_an_allowlist(server):
