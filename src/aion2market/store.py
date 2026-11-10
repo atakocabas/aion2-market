@@ -5,6 +5,7 @@ response has one, so replaying the same capture twice inserts nothing new.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import overload
@@ -127,6 +128,8 @@ MIGRATIONS = [
     # 'local': seen by this computer's game client; 'shared': downloaded from the shared store
     ("price_snapshots", "origin", "TEXT NOT NULL DEFAULT 'local'"),
     ("listings", "origin", "TEXT NOT NULL DEFAULT 'local'"),
+    # the rest of NC's item data as JSON (see item_detail); NULL until the item is looked up again
+    ("item_info", "detail", "TEXT"),
 ]
 
 # Made after MIGRATIONS, since they use columns older databases only get there.
@@ -322,10 +325,36 @@ class Store:
         """Store official item data; ``None`` records that the official source doesn't know the item."""
         info = info or {}
         self.db.execute(
-            "INSERT OR REPLACE INTO item_info VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO item_info (item_key, found, name, grade, grade_name, category, type, icon, "
+            "fetched_ts, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (item_key, 1 if info else 0, info.get("name"), info.get("grade"), info.get("gradeName"),
-             info.get("categoryName"), info.get("type"), info.get("icon"), now))
+             info.get("categoryName"), info.get("type"), info.get("icon"), now,
+             json.dumps(item_detail(info), ensure_ascii=False) if info else None))
         self.db.commit()
+
+    def set_item_detail(self, item_key: str, info: dict) -> None:
+        """Add the detail to an item that already has official data. The row itself stays (same rowid),
+        so sync doesn't upload the item again."""
+        self.db.execute("UPDATE item_info SET detail = ? WHERE item_key = ? AND found = 1",
+                        (json.dumps(item_detail(info), ensure_ascii=False), item_key))
+        self.db.commit()
+
+    def item_info_for(self, item_key: str) -> dict | None:
+        """One item's entry of item_info(), plus its stored "detail" (a dict, or None if never fetched)."""
+        row = self.db.execute("SELECT name, grade, grade_name, category, type, icon, detail FROM item_info "
+                              "WHERE item_key = ? AND found = 1", (item_key,)).fetchone()
+        if row:
+            try:
+                detail = json.loads(row[6]) if row[6] else None
+            except ValueError:
+                detail = None
+            return {"name": row[0], "grade": row[1], "grade_name": row[2], "category": row[3], "type": row[4],
+                    "icon": row[5], "source": "nc", "detail": detail if isinstance(detail, dict) else None}
+        row = self.db.execute("SELECT name, category FROM exchange_names WHERE item_key = ?", (item_key,)).fetchone()
+        if row and (row[0] or row[1]):
+            return {"name": row[0], "grade": None, "grade_name": None, "category": row[1], "type": None,
+                    "icon": None, "source": "aion2.exchange", "detail": None}
+        return None
 
     def item_info(self) -> dict[str, dict]:
         """NC's official data per item; items NC doesn't know fall back to aion2.exchange's name and category."""
@@ -415,6 +444,40 @@ class Store:
 
     def watchlist(self) -> list[tuple[str, float | None]]:
         return self.db.execute("SELECT item_key, target_price FROM watchlist ORDER BY added_ts").fetchall()
+
+
+def _stats(rows) -> list[dict]:
+    return [{"name": str(r["name"]), "value": str(r.get("value", "")),
+             "min": None if r.get("minValue") in (None, "") else str(r["minValue"])}
+            for r in rows if isinstance(r, dict) and r.get("name")] if isinstance(rows, list) else []
+
+
+def _strings(v) -> list[str]:
+    return [x for x in v if isinstance(x, str) and x] if isinstance(v, list) else []
+
+
+def item_detail(info: dict) -> dict:
+    """The part of NC's item data a tooltip shows, beyond the item_info columns. Zero and "All" mean
+    "none" there, so they are stored as None."""
+    def positive(key: str, above: int = 0) -> int | None:
+        n = _int(info.get(key))
+        return n if n is not None and n > above else None
+
+    def flag(key: str) -> bool | None:
+        return info[key] if isinstance(info.get(key), bool) else None
+
+    race = info.get("raceName")
+    return {
+        "item_level": positive("level"), "equip_level": positive("equipLevel", 1),
+        "race": race if isinstance(race, str) and race and race != "All" else None,
+        "classes": _strings(info.get("classNames")),
+        "desc": info["desc"] if isinstance(info.get("desc"), str) and info["desc"] else None,
+        "tradable": flag("tradable"), "enchantable": flag("enchantable"),
+        "max_enchant": positive("maxEnchantLevel"), "max_exceed": positive("maxExceedEnchantLevel"),
+        "manastone_slots": positive("magicStoneSlotCount"), "godstone_slots": positive("godStoneSlotCount"),
+        "main_stats": _stats(info.get("mainStats")), "sub_stats": _stats(info.get("subStats")),
+        "sub_stat_count": positive("subStatCount"), "sources": _strings(info.get("sources")),
+    }
 
 
 def _int(v) -> int | None:
