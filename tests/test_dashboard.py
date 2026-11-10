@@ -339,7 +339,7 @@ def test_static_assets_are_served_from_an_allowlist(server):
     _, html = _req(port, "GET", "/")
     assets = {"app.css": "text/css", "i18n.js": "text/javascript", "core.js": "text/javascript",
               "pages.js": "text/javascript", "views.js": "text/javascript", "detail.js": "text/javascript",
-              "main.js": "text/javascript"}
+              "tooltip.js": "text/javascript", "main.js": "text/javascript"}
     for name, ctype in assets.items():
         assert f'"{name}?v={dashboard.__version__}"'.encode() in html
         c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
