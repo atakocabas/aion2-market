@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
 
-from . import __version__, updates
+from . import __version__, iteminfo, updates
 from .market import sell_fee_pct
 from .store import Store
 
@@ -558,16 +558,35 @@ def my_sales_view(store: Store, server_id: int | None = None, lang: str = "tr") 
             "pending_total": sum(x["earnings"] for x in settled if x["pending"])}
 
 
-def crafting_view(store: Store, server_id: int | None = None, lang: str = "tr") -> dict:
-    """Buy-or-craft for every chain and craft-and-sell for every single recipe, at this server's prices."""
-    from .crafting import detect_race, plan, singles
+def _craft_prices(store: Store, server_id: int | None) -> tuple[dict, dict[str, dict], str | None]:
+    """(item rows, prices crafting is costed at, the race whose equipment this market shows)."""
+    from .crafting import detect_race
     rows = item_rows(store, server_id=server_id)
     # Only items on the market now, and never a bogus far-above-normal listing as "the price".
     prices = {r["item_key"]: {"price": r["price"], "count": r["count"]} for r in rows["items"]
               if r["count"] and r.get("suspect") != "high"}
+    return rows, prices, detect_race(prices) or detect_race({r["item_key"]: r for r in rows["items"]})
+
+
+def recipe_view(store: Store, key: str, server_id: int | None = None) -> dict:
+    """How one item is crafted, at this server's prices (the same ones crafting_view uses)."""
+    from .crafting import recipes_of
+    _, prices, race = _craft_prices(store, server_id)
+    info = store.item_info()
+    recipes = recipes_of(key, prices, sell_fee_pct(store), race)
+    for r in recipes:
+        for m in r["materials"]:
+            m["icon"] = info.get(m["item_key"], {}).get("icon")
+            m["grade_name"] = info.get(m["item_key"], {}).get("grade_name")
+    return {"item_key": key, "recipes": recipes}
+
+
+def crafting_view(store: Store, server_id: int | None = None, lang: str = "tr") -> dict:
+    """Buy-or-craft for every chain and craft-and-sell for every single recipe, at this server's prices."""
+    from .crafting import plan, singles
+    rows, prices, race = _craft_prices(store, server_id)
     info = store.item_info()
     fee = sell_fee_pct(store)
-    race = detect_race(prices) or detect_race({r["item_key"]: r for r in rows["items"]})
     chains = plan(prices, fee, lang, race)
     recipes = singles(prices, fee, race)
 
@@ -736,6 +755,11 @@ class Handler(BaseHTTPRequestHandler):
                                    "update": updates.status()})
             if path.startswith("/api/item/") and path[10:].isdigit():
                 return self._json(item_detail(store, path[10:], server_id, lang))
+            if path.startswith("/api/tooltip/") and path[13:].isdigit():
+                # May wait a few seconds for NC; each request has its own thread and connection.
+                return self._json(iteminfo.tooltip(store, path[13:]))
+            if path.startswith("/api/recipe/") and path[12:].isdigit():
+                return self._json(recipe_view(store, path[12:], server_id))
         self._send(HTTPStatus.NOT_FOUND, b"not found", "text/plain")
 
     def do_POST(self):

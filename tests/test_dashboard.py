@@ -5,7 +5,7 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from aion2market import dashboard, updates
+from aion2market import dashboard, iteminfo, updates
 from aion2market.store import Store
 
 DAY = 86400
@@ -268,6 +268,70 @@ def test_http_api(server):
     assert detail["name"] == "Pure Odyle" and detail["watch"] == {"target": 55000}
     status, body = _req(port, "GET", "/api/my-sales?server=12306&lang=en")
     assert status == 200 and json.loads(body)["listings"] == []
+
+
+def test_tooltip_endpoint(server, monkeypatch):
+    port, path = server
+    sword = {"id": 110230019, "name": "Star Dragon Lord Longsword", "gradeName": "Unique", "categoryName": "Longsword",
+             "type": "Equip", "icon": "sword.png", "level": 70, "equipLevel": 45, "raceName": "Asmodians",
+             "classNames": ["Templar"], "tradable": True, "magicStoneSlotCount": 4,
+             "mainStats": [{"id": "WeaponAccuracy", "name": "Accuracy", "value": "150"}], "sources": ["Crafting"]}
+    asked = []
+
+    def fake_fetch(key, lang="en", timeout=15):
+        asked.append((key, timeout))
+        if key == "1":
+            raise OSError("no network")
+        return sword
+
+    iteminfo._tooltip_failed.clear()
+    monkeypatch.setattr(iteminfo, "fetch", fake_fetch)
+    status, body = _req(port, "GET", "/api/tooltip/110230019?lang=en")
+    t = json.loads(body)
+    assert status == 200 and t["detail"] is True and t["name"] == "Star Dragon Lord Longsword"
+    assert (t["item_level"], t["equip_level"], t["race"], t["manastone_slots"], t["godstone_slots"]) == \
+        (70, 45, "Asmodians", 4, None)
+    assert t["main_stats"] == [{"name": "Accuracy", "value": "150", "min": None}]
+    assert json.loads(_req(port, "GET", "/api/tooltip/110230019")[1]) == t           # now from the database
+    _req(port, "POST", "/api/name", {"item_key": "1", "name": "Benim"}, {"Content-Type": "application/json"})
+    status, body = _req(port, "GET", "/api/tooltip/1")
+    miss = json.loads(body)
+    assert status == 200 and miss["detail"] is False and miss["name"] == "Benim" and miss["official_name"] is None
+    assert set(miss) == set(t) and miss["sub_stats"] == [] and miss["tradable"] is None
+    _req(port, "GET", "/api/tooltip/1")                                              # not asked again so soon
+    assert asked == [("110230019", iteminfo.TOOLTIP_TIMEOUT), ("1", iteminfo.TOOLTIP_TIMEOUT)]
+    assert _req(port, "GET", "/api/tooltip/abc")[0] == 404
+    iteminfo._tooltip_failed.clear()
+
+
+def test_recipe_endpoint(server):
+    port, path = server
+    from aion2market import recipes
+    ingot = next(r for r in recipes.SINGLES if r["key"] == "610710001" and r["qty"] == 1)
+    ore = ingot["materials"][0][0]
+    guard = next(c for c in recipes.CHAINS if c["slot"] == "Guard" and c["race"] == "Asmodians")
+    s = Store(path)
+    s.add_snapshots(NOW, 12306, [(ore, 100.0, 9), ("610710001", 500.0, 9), (guard["steps"][0]["output"][0], 7.0, 1)])
+    s.set_item_info(ore, {"name": "Ore", "gradeName": "Rare", "icon": "ore.png"}, NOW)
+    s.close()
+    status, body = _req(port, "GET", "/api/recipe/610710001?server=12306&lang=en")
+    data = json.loads(body)
+    r = next(r for r in data["recipes"] if r["qty"] == 1)
+    assert status == 200 and data["item_key"] == "610710001"
+    assert set(r) == {"profession", "category", "mastery", "race", "qty", "combo", "tries", "materials", "cost",
+                      "unit_cost", "market_price", "npc"}
+    assert (r["cost"], r["unit_cost"], r["market_price"], r["npc"], r["combo"], r["tries"]) == \
+        (200, 200, 500.0, True, False, None)
+    assert r["materials"][0] == {"item_key": ore, "name": ingot["materials"][0][1], "qty": ingot["materials"][0][2],
+                                 "price": 100.0, "via": "market", "icon": "ore.png", "grade_name": "Rare",
+                                 "has_recipe": False}
+    # a chain tier: the tier before it (bought here) leads the materials
+    step2 = json.loads(_req(port, "GET", f"/api/recipe/{guard['steps'][1]['output'][0]}")[1])["recipes"]
+    assert len(step2) == 1 and step2[0]["combo"] and step2[0]["race"] == "Asmodians"
+    assert (step2[0]["materials"][0]["item_key"], step2[0]["materials"][0]["price"], step2[0]["materials"][0]["via"]) \
+        == (guard["steps"][0]["output"][0], 7.0, "market")
+    assert json.loads(_req(port, "GET", "/api/recipe/1")[1]) == {"item_key": "1", "recipes": []}
+    assert _req(port, "GET", "/api/recipe/x1")[0] == 404
 
 
 def test_static_assets_are_served_from_an_allowlist(server):
