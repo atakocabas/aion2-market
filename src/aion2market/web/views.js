@@ -6,6 +6,21 @@ const approx = v => v == null ? money(v) : `≈${fmt(v)}`;
 const profitCell = (v, est) => v == null ? `<span class="na">–</span>`
   : `<span class="profit ${v > 0 ? "pos" : "neg"}">${est ? "≈" : ""}${v > 0 ? "+" : ""}${fmt(v)}</span>`;
 
+const npcMark = x => x.npc ? `<span class="npcmark" title="${t("NPC'den alınan malzemeler (Bound) fiyatı bilinmediği için maliyete katılmadı")}">+NPC</span>` : "";
+const crafted = m => m.via === "craft" || m.via === "craft_npc";
+/* How a material is obtained: [css class, mark after the name, explanation]. Shared by the crafting tables and the drawer's recipe. */
+const matVia = m => m.price == null ? ["miss", t(" (fiyat yok)"), ""]
+  : m.via === "npc" ? ["npc", " (NPC)", t("NPC'den alınır, fiyatı bilinmiyor")]
+  : m.via === "odyle" ? ["odyle", " (Odyle)", t("Odyle'dan dönüştürmek daha ucuz")]
+  : crafted(m) ? ["crafted", t(" (üret)"), t("Kendin üretmek marketten ucuz")] : ["", "", t("Marketten")];
+/* A material in the crafting tables: opens its own drawer on click (data-mat) and shows the item card on hover;
+   the explanation rides in the card (data-tip-note) because a native title would sit on top of it. */
+function matLine(m) {
+  const [cls, mark, why] = matVia(m);
+  return `<span class="mat ${cls}" data-mat="${esc(m.item_key)}"${tipAttr(m.item_key)} data-tip-name="${esc(m.name)}" data-tip-note="${esc(why)}">` +
+    `${m.qty}× ${esc(m.name)}${m.price == null || m.via === "npc" ? "" : " " + fmt(m.price)}${mark}</span>`;
+}
+
 function renderCraft() {
   const fee = craftData.fee_pct ?? 12;
   const craftIntro = document.getElementById("craftIntro");
@@ -16,7 +31,7 @@ function renderCraft() {
       "NPC'den alınan (Bound) malzemelerin fiyatı bilinmediğinden maliyete katılmaz (+NPC). Kâr, market kesintisi ({0}) düşüldükten sonra. " +
       "Tarifler aion2.app'in crafting veritabanından (NCSOFT verisi), kombo oranları topluluğun tablosundan; şansa bağlı olduğundan gerçek maliyet sapabilir. Fiyatlar şu anki market listesi.",
       pctRaw(fee)));
-  const named = x => `<div class="item">${iconHtml(x.icon)}<div class="txt"><span class="nm ${gradeCls(x)}">${esc(x.name)}</span>` +
+  const named = x => `<div class="item"${tipAttr(x.item_key)}>${iconHtml(x.icon)}<div class="txt"><span class="nm ${gradeCls(x)}">${esc(x.name)}</span>` +
     `<span class="sub">${x.listings ? t("{0} ilan", x.listings) : t("markette yok")}</span></div></div>`;
   const profs = [...new Set([...craftData.chains, ...(craftData.recipes || [])].map(x => x.profession))];
   if (state.craftProf && !profs.includes(state.craftProf)) state.craftProf = "";
@@ -24,7 +39,6 @@ function renderCraft() {
   profBox.innerHTML = ["", ...profs].map(p => `<button data-prof="${p}" class="${(state.craftProf || "") === p ? "on" : ""}">${p ? esc(p) : t("Hepsi")}</button>`).join("");
   profBox.onclick = e => { const b = e.target.closest("button[data-prof]"); if (b) { state.craftProf = b.dataset.prof; renderCraft(); } };
   const inProf = x => !state.craftProf || x.profession === state.craftProf;
-  const npcMark = x => x.npc ? `<span class="npcmark" title="${t("NPC'den alınan malzemeler (Bound) fiyatı bilinmediği için maliyete katılmadı")}">+NPC</span>` : "";
   const best = craftData.best_sales.filter(inProf);
   document.getElementById("craftBest").innerHTML = best.length
     ? best.slice(0, 12).map(x => `<tr data-key="${x.item_key}">
@@ -32,12 +46,6 @@ function renderCraft() {
         <td>${x.step ? approx(x.craft_cost) : money(x.craft_cost)}${npcMark(x)}</td><td class="price">${money(x.market_price)}</td>
         <td>${profitCell(x.sell_profit, !!x.step)}<span class="save">${pct(x.profit_pct)}</span></td></tr>`).join("")
     : `<tr><td colspan="5" class="empty">${t("Şu an üretip satınca kâr eden kademe yok.")}</td></tr>`;
-  const crafted = m => m.via === "craft" || m.via === "craft_npc";
-  const matLine = m => m.price == null
-    ? `<span class="miss">${m.qty}× ${esc(m.name)}${t(" (fiyat yok)")}</span>`
-    : m.via === "npc" ? `<span class="npc" title="${t("NPC'den alınır, fiyatı bilinmiyor")}">${m.qty}× ${esc(m.name)} (NPC)</span>`
-    : `<span class="${m.via === "odyle" ? "odyle" : crafted(m) ? "crafted" : ""}" title="${t(m.via === "odyle" ? "Odyle'dan dönüştürmek daha ucuz"
-        : crafted(m) ? "Kendin üretmek marketten ucuz" : "Marketten")}">${m.qty}× ${esc(m.name)} ${fmt(m.price)}${m.via === "odyle" ? " (Odyle)" : crafted(m) ? t(" (üret)") : ""}</span>`;
   const singles = (craftData.recipes || []).filter(inProf);
   document.getElementById("craftSingles").innerHTML = singles.length ? singles.map(r => `<tr data-key="${r.item_key}">
       <td class="l">${named(r)}<div class="mats">${r.materials.map(matLine).join("")}</div></td>
@@ -117,13 +125,13 @@ function renderChanges() {
   const tb = document.getElementById("rows");
   tb.innerHTML = rows.map(r => {
     const name = r.name
-      ? `<span class="nm ${gradeCls(r)}" title="${esc(r.official_name || "")}">${esc(r.name)}${r.custom_name ? `<span class="custom" title="${t("Senin verdiğin ad")}">●</span>` : ""}</span>`
+      ? `<span class="nm ${gradeCls(r)}">${esc(r.name)}${r.custom_name ? `<span class="custom">●</span>` : ""}</span>`
       : `<span class="nm unnamed">${t("Adsız")}</span>`;
     const sub = esc(r.category || "");
     const ap = id => id === state.period ? "active-period" : "";
     return `<tr data-key="${r.item_key}" class="${r.listed ? "" : "stale"} ${selected === r.item_key ? "sel" : ""}">
       ${starCell(r)}
-      <td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${sub}</span></div></div></td>
+      <td class="l"><div class="item"${tipAttr(r.item_key)}>${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${sub}</span></div></div></td>
       <td class="price">${r.suspect ? `<span class="warn" title="${r.suspect === "high"
           ? t("Son 30 günün fiyatlarının çok üstünde (7 gün ort. {0}); büyük ihtimalle tek bir uydurma ilan. Değişim gösterilmiyor.", fmt(r.typical))
           : t("Son 30 günün fiyatlarının çok altında (7 gün ort. {0}); fırsat da olabilir, hatalı ilan da.", fmt(r.typical))}">⚠</span> ` : ""}${fmt(r.price)}</td>

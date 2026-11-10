@@ -231,6 +231,8 @@ h3.sect { margin: 30px 0 10px; font: 400 18px/1.2 var(--display); color: var(--t
 tr.normal td { background: rgba(255,255,255,.015); }
 .mats .npc { color: var(--dim); font-style: italic; }
 .mats .crafted { color: var(--down); }
+.mats .mat { cursor: pointer; border-radius: 4px; }
+.mats .mat:hover { color: var(--aether); text-decoration: underline; text-underline-offset: 3px; }
 .craftprof { margin: 6px 0 4px; flex-wrap: wrap; }
 details.chain > summary { list-style: none; cursor: pointer; }
 details.chain > summary::-webkit-details-marker { display: none; }
@@ -286,6 +288,73 @@ h3 { font: 400 17px/1.2 var(--display); color: var(--text); margin: 24px 0 8px; 
 .mini th { position: static; background: none; cursor: default; }
 .mini tr { border-top: 1px solid var(--line2); cursor: default; }
 .mini tr:hover { background: none; }
+/* recipe in the drawer: a small ledger, materials are buttons that open their own drawer */
+.recipe { background: var(--bg2); border: 1px solid var(--line2); border-radius: 10px; padding: 10px 6px 8px; margin-bottom: 8px; }
+aside .top + h3 { margin-top: 18px; }
+.rhead { color: var(--muted); font-size: 12.5px; padding: 0 6px 8px; }
+.rhead .badge { margin-left: 4px; }
+.rcols, .rmat { display: grid; grid-template-columns: 28px minmax(0, 1fr) 84px 92px; gap: 0 10px; align-items: center; }
+.rcols { color: var(--dim); font-size: 11.5px; padding: 0 6px 3px; }
+.rcols span:first-child { grid-column: 1 / 3; }
+.rcols span + span, .rp { text-align: right; }
+.rmat { width: 100%; background: none; border: 0; border-top: 1px solid var(--line2); padding: 6px; text-align: left;
+  cursor: pointer; border-radius: 0; transition: background .12s; }
+.rmat:hover, .rmat:focus-visible { background: var(--aether-soft); }
+.rmat:focus-visible { outline-offset: -2px; }
+.rmat .icon { width: 28px; height: 28px; border-radius: 6px; }
+.rn { min-width: 0; font-weight: 600; line-height: 1.3; }
+.rn .via, .rn .has { display: inline-block; margin-left: 6px; font-size: 11.5px; font-weight: 500; color: var(--dim); }
+.rn .via.odyle { color: #c99bff; } .rn .via.miss { color: var(--up); } .rn .via.crafted { color: var(--down); }
+.rn .via.npc { font-style: italic; }
+.rn .has { color: var(--aether); }
+.rn .has::after { content: " ›"; }
+.rp { font-variant-numeric: tabular-nums; color: var(--muted); }
+.rp.sum { color: var(--text); font-weight: 600; }
+.rtot { border-top: 1px solid var(--line); margin-top: 2px; padding: 8px 6px 0; }
+.rtot div { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.rtot b { color: var(--text); font-variant-numeric: tabular-nums; }
+.rtot .gold { color: var(--gold); }
+.rnote { padding: 6px 6px 0; }
+
+/* item hover card: the game's item window in the dashboard's night-blue. Above the drawer (10), modal (30) and toast (40). */
+.itemtip { position: fixed; left: 0; top: 0; z-index: 50; width: 320px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px);
+  overflow: hidden; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .09s, visibility 0s .09s;
+  background: linear-gradient(180deg, #252c49, #171c30 150px); border: 1px solid #46507a; border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(8,10,22,.7), 0 22px 50px -12px rgba(0,0,0,.75); font-size: 12.5px; line-height: 1.45; }
+.itemtip.on { opacity: 1; visibility: visible; transition: opacity .09s; }
+/* The head takes the grade colour: name, a wash behind it and the rule under it. */
+.it-head { display: flex; gap: 11px; align-items: center; padding: 12px 14px 11px;
+  background: radial-gradient(130% 160% at 0 0, color-mix(in srgb, currentColor 16%, transparent), transparent 72%);
+  border-bottom: 1px solid; border-image: linear-gradient(90deg, currentColor, transparent 92%) 1; }
+.it-head .icon { width: 44px; height: 44px; border-radius: 9px; border-color: currentColor; }
+.it-head .nm { font: 400 17px/1.2 var(--display); letter-spacing: .01em; overflow-wrap: anywhere; }
+.it-head .unnamed { color: var(--dim); font-style: italic; }
+.it-head .kind { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.it-sec { padding: 9px 14px; }
+.it-sec + .it-sec { border-top: 1px solid var(--line2); }
+.it-lvl { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.ilvl span { display: block; color: var(--muted); font-size: 11.5px; }
+.ilvl b { font: 400 30px/1 var(--display); color: var(--text); }
+.it-lvl .req { display: flex; flex-direction: column; align-items: flex-end; color: var(--muted); text-align: right; }
+.it-stats div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.it-stats span { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.it-stats b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.it-stats.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; font-size: 11.5px; }
+.it-stats.two b { font-weight: 500; color: var(--aether); }
+.it-cap { color: var(--dim); font-size: 11.5px; margin-bottom: 3px; }
+/* empty sockets, as the game draws them */
+.sock { display: inline-flex; align-items: center; gap: 5px; }
+.sock i { width: 8px; height: 8px; transform: rotate(45deg); border: 1px solid var(--aether); background: var(--aether-soft); }
+.sock em { font-style: normal; margin-left: 3px; }
+.it-desc { color: var(--muted); white-space: pre-line; overflow-wrap: anywhere; }
+.it-meta { color: var(--muted); font-size: 12px; }
+.it-meta span { color: var(--dim); }
+.it-meta .no { color: var(--up); }
+.it-skel i { display: block; height: 8px; border-radius: 4px; background: var(--panel2); margin: 5px 0; }
+.it-skel i:nth-child(2) { width: 72%; } .it-skel i:nth-child(3) { width: 48%; }
+.it-price { color: var(--muted); background: rgba(0,0,0,.18); }
+.it-price b { color: var(--gold); font-size: 15px; font-variant-numeric: tabular-nums; }
+.it-price span { float: right; color: var(--dim); line-height: 22px; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 8px); background: var(--panel2);
   border: 1px solid var(--aether); border-radius: 10px; padding: 9px 16px; opacity: 0; transition: opacity .2s, transform .2s; z-index: 40;
   box-shadow: 0 12px 30px -10px rgba(0,0,0,.6); }

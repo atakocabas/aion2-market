@@ -239,6 +239,18 @@ const EN = {
   "Ad kaydedildi": "Name saved", "Resmi ada dönüldü": "Back to the official name", "Ad silindi": "Name removed",
   "Hedef kaydedildi": "Target saved", "Listeden gizlendi": "Hidden from list", "Listede tekrar gösteriliyor": "Shown in list again",
   "Grafik için en az iki kayıt gerekli.": "At least two records are needed for a chart.", " · aralık {0}–{1}": " · range {0}–{1}",
+  // recipe in the drawer
+  "Tarif": "Recipe", "tarifi var": "has a recipe", "Kombo": "Combo", "Kombo (Splendent) sonucu": "Combo (Splendent) result",
+  "≈ {0} deneme": "≈ {0} attempts", "Adet maliyeti": "Cost per unit",
+  "Bir malzemeye tıklayınca onun fiyatı ve tarifi açılır.": "Click a material to open its price and recipe.",
+  "Bir deneme, önceki kademe dışındaki malzemelerdir; önceki kademe üretim maliyetine bir kez eklenir.":
+    "One attempt covers the materials other than the previous tier; the previous tier is added to the crafting cost once.",
+  // item hover card
+  "Item Seviyesi": "Item Level", "Gereken seviye {0}": "Requires level {0}", "Rastgele özellikler": "Random stats",
+  "Rastgele özellikler ({0} tanesi gelir)": "Random stats ({0} of these roll)", "Manastone yuvası": "Manastone slots",
+  "Godstone yuvası": "Godstone slots", "Azami güçlendirme": "Max enchant", "aşma +{0}": "exceed +{0}",
+  "Güçlendirilemez": "Cannot be enchanted", "Elde edilişi": "Obtained from", "Takas edilebilir": "Tradable",
+  "Takas edilemez": "Not tradable", "Resmi ad: {0}": "Official name: {0}",
 };
 const LANGS = ["tr", "en"];
 let LANG = "tr", LOC = "tr-TR", NF, PF1, PF2;

@@ -30,7 +30,11 @@ document.querySelectorAll("#invSignal button").forEach(b => b.onclick = () => { 
 document.querySelectorAll("#invPlace button").forEach(b => b.onclick = () => {
   if (state.invPlace !== b.dataset.g) { state.invPlace = b.dataset.g; save(); render(); refresh(); }
 });
-document.getElementById("craftView").onclick = e => { const tr = e.target.closest("tr[data-key]"); if (tr) openItem(tr.dataset.key); };
+// A material line opens that material's own drawer; anywhere else on the row opens the row's item.
+document.getElementById("craftView").onclick = e => {
+  const hit = e.target.closest("[data-mat], tr[data-key]");
+  if (hit) openItem(hit.dataset.mat || hit.dataset.key);
+};
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { if (state.view !== b.dataset.view) setView(b.dataset.view); });
 const bind = (id, key, get) => { const el = document.getElementById(id); el.addEventListener("input", () => { state[key] = get(el); save(); render(); }); };
 bind("q", "q", el => el.value);

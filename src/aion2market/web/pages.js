@@ -80,16 +80,18 @@ function renderDeals() {
         pctRaw(rules.min_discount ?? 10), pctRaw(rules.min_drop ?? 5), rules.min_listings ?? 2, rules.min_days ?? 3));
   document.getElementById("dealRows").innerHTML = rows.map((r, i) => {
     const d = r.deal;
-    const name = r.name ? `<span class="nm ${gradeCls(r)}">${esc(r.name)}</span>` : `<span class="nm unnamed">${t("Adsız")}</span>`;
+    const name = r.name ? `<span class="nm ${gradeCls(r)}"${tipAttr(r.item_key)}>${esc(r.name)}</span>`
+      : `<span class="nm unnamed"${tipAttr(r.item_key)}>${t("Adsız")}</span>`;
     const sub = esc(r.category || "");
-    // One short line with what the columns don't show; the full reasons stay on hover.
+    // One short line with what the columns don't show; the full reasons stay on hover
+    // (on the lines under the name: the name and icon show the item card instead).
     const full = [...d.reasons, ...(d.warning ? d.warning.split(" · ").map(w => "⚠ " + w) : [])].join("\n");
     const note = (d.note || []).map(n => n.warn ? `<span class="warn">⚠ ${esc(n.text)}</span>` : esc(n.text)).join(" · ");
     return `<tr data-key="${r.item_key}">
       <td class="rank">${i + 1}</td>
       ${starCell(r)}
-      <td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt" title="${esc(full)}">${name}<span class="sub">${sub}</span>
-        ${note ? `<span class="note">${note}</span>` : ""}</div></div></td>
+      <td class="l"><div class="item">${iconHtml(r.icon, false, r.item_key)}<div class="txt">${name}<span class="sub" title="${esc(full)}">${sub}</span>
+        ${note ? `<span class="note" title="${esc(full)}">${note}</span>` : ""}</div></div></td>
       <td class="price">${fmt(r.price)}</td>
       <td class="muted">${fmt(r.typical)}</td>
       <td><span class="disc">${pct(d.discount)}</span><span class="save">${t("adet başı {0} ucuz", fmt(d.saving))}</span></td>
@@ -127,7 +129,7 @@ function renderMorphs(list) {
     help(intro, "Nasıl hesaplanıyor?",
       `<b>${t("Üretim için")}</b>${t(": malzeme Odyle'dan pahalıysa Odyle alıp dönüştürmek daha ucuz.")} ` +
       `<b>${t("Satış için")}</b>${t(": Odyle alıp dönüştürüp malzemeyi satınca market kesintisinden sonra kalan. Dönüştürmenin kendi maliyeti (varsa) hesaba katılmadı.")}`);
-  const cell = it => `<div class="item">${iconHtml(it.icon)}<div class="txt"><span class="nm ${gradeCls(it)}">${esc(it.name || it.item_key)}</span><span class="sub">${t("{0} ilan", it.count)}</span></div></div>`;
+  const cell = it => `<div class="item"${tipAttr(it.item_key)}>${iconHtml(it.icon)}<div class="txt"><span class="nm ${gradeCls(it)}">${esc(it.name || it.item_key)}</span><span class="sub">${t("{0} ilan", it.count)}</span></div></div>`;
   document.getElementById("morphRows").innerHTML = list.length ? list.map(m => `<tr>
       <td class="l">${cell(m.material)}</td><td class="price">${fmt(m.material.price)}</td>
       <td class="l">${cell(m.odyle)}</td><td class="price">${fmt(m.odyle.price)}</td>
@@ -161,7 +163,7 @@ function renderInventory() {
       : `<span class="chg ${r.premium > 0.05 ? "up" : r.premium < -0.05 ? "down" : "flat"}"><span class="p">${r.premium > 0 ? "+" : ""}${pct(r.premium)}</span></span>`;
     return `<tr data-key="${r.item_key}">
       ${starCell(r)}
-      <td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${esc(r.category || "")}</span></div></div></td>
+      <td class="l"><div class="item"${tipAttr(r.item_key)}>${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${esc(r.category || "")}</span></div></div></td>
       <td class="price">${fmt(r.owned)}</td>
       <td class="price">${r.suspect ? `<span class="warn" title="${t("En ucuz ilan 30 günlük fiyatlara göre uç değerde")}">⚠</span> ` : ""}${fmt(r.price)}</td>
       <td class="muted">${fmt(r.typical)}</td>
@@ -192,7 +194,7 @@ function renderInventory() {
 const withCount = r => (r.count = r.market_count ?? 0, r);
 const itemCell = r => {
   const name = r.name ? `<span class="nm ${gradeCls(r)}">${esc(r.name)}</span>` : `<span class="nm unnamed">${t("Adsız")}</span>`;
-  return `<td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${esc(r.category || "")}</span></div></div></td>`;
+  return `<td class="l"><div class="item"${tipAttr(r.item_key)}>${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${esc(r.category || "")}</span></div></div></td>`;
 };
 // Signed % against the market; positive (you're above / the market is above) is red, like a rise.
 const signedPct = v => v == null ? `<span class="na">–</span>`
@@ -292,7 +294,7 @@ function renderFavorites() {
     const status = favStatus(r)[1];
     return `<tr data-key="${r.item_key}">
       ${starCell(r)}
-      <td class="l"><div class="item">${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${esc(r.category || "")}</span></div></div></td>
+      <td class="l"><div class="item"${tipAttr(r.item_key)}>${iconHtml(r.icon)}<div class="txt">${name}<span class="sub">${esc(r.category || "")}</span></div></div></td>
       <td class="price">${r.suspect ? `<span class="warn" title="${t("En ucuz ilan 30 günlük fiyatlara göre uç değerde")}">⚠</span> ` : ""}${fmt(r.price)}</td>
       <td class="price">${r.target ? fmt(r.target) : `<span class="na">${t("yok")}</span>`}</td>
       <td>${gapCell}</td>

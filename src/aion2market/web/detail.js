@@ -9,11 +9,67 @@ function closeDrawer() {
   render();
 }
 
+// A missing or failing recipe endpoint only drops the recipe section; the rest of the drawer still opens.
+async function loadRecipes(key, qs) {
+  try {
+    const r = await fetch(`/api/recipe/${key}${qs}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    return (await r.json()).recipes || [];
+  } catch {
+    return [];
+  }
+}
+
+/* What an item is crafted from. Materials are buttons: a click opens that material's drawer, so the tree can be
+   walked down, and hovering shows its item card. Chain tiers rest on expected attempts, hence "≈"; their `cost`
+   is one attempt without the previous tier's item (used once per finished item), so it isn't the sum of the rows. */
+function recipeHtml(recipes) {
+  if (!recipes.length) return "";
+  return `<h3>${t("Tarif")}</h3>` + recipes.map(r => {
+    const chain = r.tries != null;
+    const head = [r.profession, r.category].filter(Boolean).map(esc);
+    if (r.mastery != null) head.push(t("Mastery {0}", r.mastery));
+    if (r.qty > 1) head.push("×" + r.qty);
+    if (r.race) head.push(esc(r.race));
+    if (chain) head.push(t("≈ {0} deneme", PF.format(r.tries)));
+    const total = (k, v) => `<div><span>${k}</span><b>${v}</b></div>`;
+    return `<div class="recipe">
+      <div class="rhead">${head.join(" · ")}${r.combo ? ` <span class="badge craft" title="${t("Kombo (Splendent) sonucu")}">${t("Kombo")}</span>` : ""}</div>
+      <div class="rcols"><span>${t("Malzeme")}</span><span>${t("Birim")}</span><span>${t("Toplam")}</span></div>
+      ${r.materials.map(m => {
+        const [cls, mark, why] = matVia(m), priced = m.price != null && m.via !== "npc";
+        return `<button type="button" class="rmat" data-mat="${esc(m.item_key)}"${tipAttr(m.item_key)} data-tip-name="${esc(m.name)}" data-tip-note="${esc(why)}">
+          ${iconHtml(m.icon)}
+          <span class="rn"><span class="${gradeCls(m)}">${m.qty}× ${esc(m.name)}</span>${mark ? `<span class="via ${cls}">${mark.trim()}</span>` : ""}${
+            m.has_recipe ? `<span class="has">${t("tarifi var")}</span>` : ""}</span>
+          <span class="rp">${priced ? fmt(m.price) : `<span class="na">–</span>`}</span>
+          <span class="rp sum">${priced ? fmt(m.qty * m.price) : `<span class="na">–</span>`}</span>
+        </button>`;
+      }).join("")}
+      <div class="rtot">
+        ${total(t(chain ? "Bir deneme" : "Malzeme maliyeti"), money(r.cost) + npcMark(r))}
+        ${chain ? total(t("Üretim maliyeti"), approx(r.unit_cost)) : r.qty > 1 ? total(t("Adet maliyeti"), money(r.unit_cost)) : ""}
+        ${total(t("Market fiyatı"), `<span class="gold">${money(r.market_price)}</span>`)}
+      </div>
+      ${chain ? `<div class="hint rnote">${t("Bir deneme, önceki kademe dışındaki malzemelerdir; önceki kademe üretim maliyetine bir kez eklenir.")}</div>` : ""}
+    </div>`;
+  }).join("") + `<div class="hint" style="margin-top:6px">${t("Bir malzemeye tıklayınca onun fiyatı ve tarifi açılır.")}</div>`;
+}
+
+let drawerFrom = null;                   // the page the drawer was opened from; decides where the recipe sits
 async function openItem(key, quiet) {
   selected = key;
+  if (!quiet) drawerFrom = state.view;
   const row = data.items.find(r => r.item_key === key);
-  const d = await (await fetch(`/api/item/${key}?lang=${LANG}${state.server ? "&server=" + state.server : ""}`, { cache: "no-store" })).json();
-  if (quiet && document.activeElement && drawer.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;
+  const qs = `?lang=${LANG}${state.server ? "&server=" + state.server : ""}`;
+  const [d, recipes] = await Promise.all([
+    fetch(`/api/item/${key}${qs}`, { cache: "no-store" }).then(r => r.json()), loadRecipes(key, qs)]);
+  if (selected !== key) return;          // closed, or another item (a material) was opened meanwhile
+  const focused = drawer.contains(document.activeElement) ? document.activeElement : null;
+  if (quiet && focused && focused.tagName === "INPUT") return;
+  // The quiet refresh rewrites the drawer: put keyboard focus back on the same material afterwards.
+  const focusMat = quiet && focused && focused.dataset.mat ? [...drawer.querySelectorAll("[data-mat]")].indexOf(focused) : -1;
+  const recipe = recipeHtml(recipes), recipeFirst = drawerFrom === "craft";
   const statBox = (k, x) => x ? `<div class="stat"><div class="k">${k}</div><div class="v">${chg(x.change, x.partial, x.ts)}</div><div class="s">${fmt(x.price)} · ${fmtTime(x.ts)}</div></div>` : "";
   const since30 = Date.now() / 1000 - 30 * 86400;
   // Outliers (bogus listings far from the 30-day median) stay out of the chart and the low/high.
@@ -28,7 +84,7 @@ async function openItem(key, quiet) {
   const lst = d.listings;
   drawer.innerHTML = `
     <div class="top">
-      ${iconHtml(d.info && d.info.icon, true)}
+      ${iconHtml(d.info && d.info.icon, true, key)}
       <div>
         <div class="brand">Item ${esc(key)}</div>
         <h2 class="${gradeCls(d.info)}">${d.name ? esc(d.name) : `<span class="muted">${t("Adsız item")}</span>`}</h2>
@@ -36,6 +92,7 @@ async function openItem(key, quiet) {
       </div>
       <button class="x" id="dx" title="${t("Kapat")}">✕</button>
     </div>
+    ${recipeFirst ? recipe : ""}
     <div class="namebox">
       <input id="nm" placeholder="${d.info && d.info.name ? esc(d.info.name) : t("Bu item'a bir ad ver")}" value="${d.custom_name ? esc(d.name) : ""}" maxlength="80">
       <button class="btn" id="nmsave">${t("Kaydet")}</button>
@@ -58,6 +115,7 @@ async function openItem(key, quiet) {
           : v != null && d.weekdays.dearest_day === i ? "dear" : ""}">
           <div class="n">${DAYS[LANG][i]}</div><div class="v">${v == null ? "–" : (v > 0 ? "+" : "") + PF.format(v) + "%"}</div></div>`).join("")}</div>
       <div class="hint">${t("En ucuz <b>{0}</b>, en pahalı <b>{1}</b> (fark {2}). Son 30 güne dayanır; her gün için birkaç örnek var, kesin değildir.", d.weekdays.cheapest, d.weekdays.dearest, pct(d.weekdays.spread))}</div>` : ""}
+    ${recipeFirst ? "" : recipe}
     <div class="actions" style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
       <button class="btn" id="hideOne">${t(exclude.items.includes(key) ? "Listede tekrar göster" : "⊘ Listede gösterme")}</button>
       ${row && !exclude.items.includes(key) && exclude.rules.some(rule => ruleMatches(rule, row))
@@ -78,6 +136,7 @@ async function openItem(key, quiet) {
       : `<div class="hint">${t("Bu item oyunda henüz aranmadı. Aradığında ilanlar burada görünür.")}</div>`}
   `;
   drawChart(document.getElementById("chart"), shownHistory, shownRanges);
+  if (focusMat >= 0) drawer.querySelectorAll("[data-mat]")[focusMat]?.focus({ preventScroll: true });
   document.getElementById("dx").onclick = closeDrawer;
   document.getElementById("nmsave").onclick = () => {
     const v = document.getElementById("nm").value.trim();
@@ -109,6 +168,8 @@ async function openItem(key, quiet) {
     render();
   }
 }
+
+drawer.addEventListener("click", e => { const m = e.target.closest("[data-mat]"); if (m) openItem(m.dataset.mat); });
 
 function drawChart(box, history, ranges = []) {
   if (history.length < 2) {

@@ -31,7 +31,9 @@ const ago = ts => {
   return h < 48 ? t("{0} sa önce", h) : t("{0} gün önce", Math.round(h / 24));
 };
 const gradeCls = r => r && r.grade_name ? "g-" + r.grade_name.toLowerCase().replace(/[^a-z]/g, "") : "";
-const iconHtml = (url, big) => `<span class="icon${big ? " big" : ""}"${url ? ` style="background-image:url('${encodeURI(url)}')"` : ""}></span>`;
+// data-tip marks an element for the item hover card (tooltip.js).
+const tipAttr = key => ` data-tip="${esc(key)}"`;
+const iconHtml = (url, big, tip) => `<span class="icon${big ? " big" : ""}"${tip ? tipAttr(tip) : ""}${url ? ` style="background-image:url('${encodeURI(url)}')"` : ""}></span>`;
 const PERIOD_LABEL ={ prev: "son listelemeye göre", week: "7 güne göre", month: "30 güne göre" };
 
 const COLS = [
@@ -176,8 +178,8 @@ function renderHide() {
       : `<div class="hint">${t("Henüz kural yok.")}</div>`}
 
     <h3>${t("Tek tek gizlenen itemler")}</h3>
-    ${hiddenItems.length ? hiddenItems.map(r => `<div class="hidden-item">${iconHtml(r.icon)}
-        <span class="${gradeCls(r)}">${esc(r.name || t("Adsız"))}</span><span class="muted">${r.item_key}</span>
+    ${hiddenItems.length ? hiddenItems.map(r => `<div class="hidden-item">${iconHtml(r.icon, false, r.item_key)}
+        <span class="${gradeCls(r)}"${tipAttr(r.item_key)}>${esc(r.name || t("Adsız"))}</span><span class="muted">${r.item_key}</span>
         <button class="x" data-show-item="${r.item_key}" title="${t("Tekrar göster")}">✕</button></div>`).join("")
       : `<div class="hint">${t("Yok. Bir item'ı tek başına gizlemek için satırına tıkla, detay panelinde “Listede gösterme”yi seç.")}</div>`}
 
