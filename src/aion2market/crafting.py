@@ -83,24 +83,78 @@ def detect_race(prices: dict[str, dict]) -> str | None:
 
 def plan(prices: dict[str, dict], fee_pct: float = 12.0, lang: str = "tr", race: str | None = None) -> list[dict]:
     """prices: item_key -> {'price', 'count'} for items listed right now. Chains of ``race`` (all if None)."""
+    return [_plan_chain(chain, prices, fee_pct, lang) for chain in CHAINS if not race or chain["race"] == race]
+
+
+def _plan_chain(chain: dict, prices: dict[str, dict], fee_pct: float, lang: str) -> dict:
+    steps, prev, npc = [], None, False
+    for step in chain["steps"]:
+        attempt, lines, step_npc = _step_cost(step, prices)
+        npc = npc or step_npc
+        tier = _tier(step["output"], step["tries"], attempt, prev, prices, fee_pct)
+        entry = {"step": step["step"], "materials": lines, "result": tier, "npc": step_npc}
+        if "normal_output" in step:
+            entry["normal_result"] = _tier(step["normal_output"], step["normal_tries"], attempt, prev,
+                                           prices, fee_pct)
+        steps.append(entry)
+        prev = tier
+    return {"slot": chain["slot"], "profession": chain["profession"], "race": chain["race"],
+            "steps": steps, "route": route(steps, lang), "npc": npc}
+
+
+# Chain results by item key: (chain, step index, whether it is the last step's normal result).
+_CHAIN_RESULTS: dict[str, list[tuple[dict, int, bool]]] = {}
+for _chain in CHAINS:
+    for _i, _step in enumerate(_chain["steps"]):
+        _CHAIN_RESULTS.setdefault(_step["output"][0], []).append((_chain, _i, False))
+        if "normal_output" in _step:
+            _CHAIN_RESULTS.setdefault(_step["normal_output"][0], []).append((_chain, _i, True))
+
+
+def has_recipe(key: str) -> bool:
+    return key in _CHAIN_RESULTS or bool(recipes_for(key))
+
+
+def _material_lines(lines: list[dict]) -> list[dict]:
+    return [{"item_key": m["item_key"], "name": m["name"], "qty": m["qty"], "price": m["price"], "via": m["via"],
+             "has_recipe": has_recipe(m["item_key"])} for m in lines]
+
+
+def recipes_of(key: str, prices: dict[str, dict], fee_pct: float = 12.0, race: str | None = None) -> list[dict]:
+    """Every way to craft ``key`` (a single recipe's output or any tier of an equipment chain), priced
+    like plan() and singles(). With a ``race``, the other race's recipes are left out unless they are
+    the only ones."""
     out = []
-    for chain in CHAINS:
-        if race and chain["race"] != race:
-            continue
-        steps, prev, npc = [], None, False
-        for step in chain["steps"]:
-            attempt, lines, step_npc = _step_cost(step, prices)
-            npc = npc or step_npc
-            tier = _tier(step["output"], step["tries"], attempt, prev, prices, fee_pct)
-            entry = {"step": step["step"], "materials": lines, "result": tier}
-            if "normal_output" in step:
-                entry["normal_result"] = _tier(step["normal_output"], step["normal_tries"], attempt, prev,
-                                               prices, fee_pct)
-            steps.append(entry)
-            prev = tier
-        out.append({"slot": chain["slot"], "profession": chain["profession"], "race": chain["race"],
-                    "steps": steps, "route": route(steps, lang), "npc": npc})
-    return out
+    for chain, i, normal in _CHAIN_RESULTS.get(key, []):
+        steps = _plan_chain(chain, prices, fee_pct, "en")["steps"]
+        tier = steps[i]["normal_result" if normal else "result"]
+        npc_before = False            # NPC materials on the cheapest route to the previous tier
+        for s in steps[:i]:
+            npc_before = s["result"]["best"] == "craft" and (s["npc"] or npc_before)
+        materials = _material_lines(steps[i]["materials"])
+        if i:
+            # The previous tier's result is consumed too, once per finished item (not per attempt), and
+            # it costs whatever its own cheapest route does.
+            prev = steps[i - 1]["result"]
+            via = {"buy": "market", "craft": "craft_npc" if npc_before else "craft"}.get(prev["best"])
+            materials.insert(0, {"item_key": prev["item_key"], "name": prev["name"], "qty": 1,
+                                 "price": prev["exact_cost"], "via": via, "has_recipe": True})
+        out.append({"profession": chain["profession"], "category": chain["slot"],
+                    "mastery": chain["steps"][i]["mastery"], "race": chain["race"], "qty": 1,
+                    "combo": not normal, "tries": tier["tries"], "materials": materials,
+                    "cost": tier["attempt_cost"], "unit_cost": tier["craft_cost"],
+                    "market_price": tier["market_price"],
+                    "npc": steps[i]["npc"] or npc_before})
+    for r in recipes_for(key):
+        cost, lines, npc = recipe_cost(r, prices)
+        out.append({"profession": r["profession"], "category": r["category"], "mastery": r["mastery"],
+                    "race": r["race"], "qty": r["qty"], "combo": False, "tries": None,
+                    "materials": _material_lines(lines),
+                    "cost": None if cost is None else round(cost),
+                    "unit_cost": None if cost is None else round(cost / r["qty"]),
+                    "market_price": prices.get(key, {}).get("price"), "npc": npc})
+    mine = [r for r in out if r["race"] in (race, None)] if race else out
+    return mine or out
 
 
 def singles(prices: dict[str, dict], fee_pct: float = 12.0, race: str | None = None) -> list[dict]:
