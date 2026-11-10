@@ -317,7 +317,7 @@ aside .top + h3 { margin-top: 18px; }
 .rnote { padding: 6px 6px 0; }
 
 /* item hover card: the game's item window in the dashboard's night-blue. Above the drawer (10), modal (30) and toast (40). */
-.itemtip { position: fixed; left: 0; top: 0; z-index: 50; width: 320px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px);
+.itemtip { position: fixed; left: 0; top: 0; z-index: 50; width: 360px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px);
   overflow: hidden; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .09s, visibility 0s .09s;
   background: linear-gradient(180deg, #252c49, #171c30 150px); border: 1px solid #46507a; border-radius: 10px;
   box-shadow: 0 0 0 1px rgba(8,10,22,.7), 0 22px 50px -12px rgba(0,0,0,.75); font-size: 12.5px; line-height: 1.45; }
@@ -339,7 +339,7 @@ aside .top + h3 { margin-top: 18px; }
 .it-stats div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .it-stats span { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .it-stats b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.it-stats.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; font-size: 11.5px; }
+.it-stats.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 14px; font-size: 11.5px; }
 .it-stats.two b { font-weight: 500; color: var(--aether); }
 .it-cap { color: var(--dim); font-size: 11.5px; margin-bottom: 3px; }
 /* empty sockets, as the game draws them */
